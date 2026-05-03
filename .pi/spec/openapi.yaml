@@ -1,0 +1,2456 @@
+openapi: 3.0.3
+info:
+  title: Choplinks Bot API
+  version: 1.0.0
+  description: |
+    OpenAPI 3 spec for current JSON API endpoints in choplinks-bot.
+
+    Includes:
+    - Telegram auth endpoints
+    - Cart endpoints
+    - Payment endpoints
+    - Location endpoints
+    - Public restaurant and search endpoints
+    - Restaurant admin endpoints
+    - Menu admin endpoints
+    - Referral admin endpoints
+
+    Excludes server-rendered `/app/*` view routes.
+
+    Location delivery workflow:
+    1. Admin creates predefined locations with `/location/`.
+    2. Admin sets optional restaurant-to-location delivery price overrides with `/location-prices/`.
+    3. App client fetches locations from `/locations`.
+    4. Authenticated user selects one cart location with `PATCH /cart/location`.
+    5. Cart pricing uses one delivery fee per unique restaurant in cart.
+    6. If no override exists for `(restaurant_id, location_id)`, restaurant default `delivery_fee` is used.
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+tags:
+  - name: Auth
+    description: Telegram app authentication and current-user lookup.
+  - name: Cart
+    description: Authenticated app cart operations. Cart owns selected location, referral code, and user info.
+  - name: Payments
+    description: Authenticated payment initialization, verification, cancellation, status lookup, and provider webhook processing.
+  - name: Location
+    description: Predefined admin-managed locations and restaurant-to-location delivery price overrides.
+  - name: Public Discovery
+    description: Customer-facing read endpoints for restaurant discovery, restaurant detail, menu browsing, and search.
+  - name: Order History
+    description: Authenticated customer order history read endpoints for previous checked-out carts and frontend-driven reorder support.
+  - name: Restaurant
+    description: Admin restaurant management endpoints protected by `abidoshaker` header.
+  - name: Menu
+    description: Admin restaurant menu management endpoints protected by `abidoshaker` header.
+  - name: Referral
+    description: Admin referral and sales-report endpoints protected by `abidoshaker` header.
+
+paths:
+  /auth/telegram:
+    post:
+      tags: [Auth]
+      summary: Authenticate user with Telegram Mini App init data
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TelegramAuthRequest'
+      responses:
+        '200':
+          description: Authenticated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccessResponse'
+        '400':
+          description: Invalid auth payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid Telegram auth data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Get authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current user fetched successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSuccessResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /cart/:
+    get:
+      tags: [Cart]
+      summary: Get active cart for authenticated user
+      description: |
+        Returns active cart with selected location, child restaurant orders, and cart pricing summary.
+
+        Pricing notes:
+        - delivery is charged once per unique restaurant in cart
+        - delivery uses restaurant-location override when available
+        - fallback uses restaurant default `delivery_fee`
+        - transaction fee is applied once per cart
+        - service charge is applied once per cart
+        - referral discount is applied once per cart when referral code exists in ambassadors table
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Active cart fetched successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartSuccessResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Cart]
+      summary: Delete authenticated user's active cart
+      description: |
+        Deletes whole active cart for authenticated user.
+
+        Behavior:
+        - removes cart and all child orders/items through existing delete behavior
+        - if no active cart exists, still returns success with `result = null`
+        - useful for one-tap clear-cart UX
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Cart deleted successfully or no active cart existed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartSuccessResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /payments/initialize:
+    post:
+      tags: [Payments]
+      summary: Initialize payment for active cart
+      description: |
+        Initializes provider payment session for one active cart.
+
+        Behavior:
+        - requires `cart_id`, `email`, and frontend `callback_url`
+        - stores email on user profile for future default use
+        - allows only one pending payment per cart
+        - locks cart after successful initialization
+        - returns provider authorization details for frontend popup launch
+        - frontend should provide Paystack public key locally; backend does not return it
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InitializePaymentRequest'
+      responses:
+        '200':
+          description: Payment initialized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentInitializeSuccessResponse'
+        '400':
+          description: Invalid request, cart invalid, or cart locked/empty
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /payments/verify:
+    post:
+      tags: [Payments]
+      summary: Verify payment by reference
+      description: |
+        Frontend callback page should call this after provider popup redirects back.
+
+        Behavior:
+        - verifies payment server-side with provider
+        - does not trust frontend callback alone
+        - on success, finalizes cart and marks child orders paid/completed
+        - if payment fails or is cancelled, cart is unlocked for further edits
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyPaymentRequest'
+      responses:
+        '200':
+          description: Payment verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentSuccessResponse'
+        '400':
+          description: Invalid request or payment mismatch/failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /payments/cancel:
+    post:
+      tags: [Payments]
+      summary: Cancel pending payment and unlock cart
+      description: |
+        Cancels one pending payment reference for authenticated user.
+
+        Useful when popup is closed or user aborts payment.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelPaymentRequest'
+      responses:
+        '200':
+          description: Payment cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentSuccessResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /payments/{reference}:
+    get:
+      tags: [Payments]
+      summary: Get payment status by reference
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: reference
+          in: path
+          required: true
+          schema:
+            type: string
+          example: pay_123_456
+      responses:
+        '200':
+          description: Payment status fetched
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentSuccessResponse'
+        '400':
+          description: Invalid reference or payment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /payments/webhook:
+    post:
+      tags: [Payments]
+      summary: Provider webhook receiver
+      description: |
+        Public webhook endpoint for payment provider.
+
+        Behavior:
+        - validates provider signature
+        - stores raw event payload
+        - verifies reference server-side before finalizing cart
+        - idempotent against repeated events
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Webhook processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccessResponse'
+        '400':
+          description: Invalid webhook payload or signature
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /cart/orders:
+    post:
+      tags: [Cart]
+      summary: Create a new restaurant-scoped dish group inside the active cart
+      description: |
+        Creates one child cart order under selected restaurant.
+
+        Frontend mapping guidance:
+        - each child order in cart may be treated as one UI dish group
+        - labels such as `Dish 1` and `Dish 2` are frontend presentation only
+        - backend persistent identifier for that group is returned `order.id`
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCartOrderRequest'
+      responses:
+        '200':
+          description: Cart order created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartSuccessResponse'
+        '400':
+          description: Invalid request or restaurant not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /cart/orders/{id}:
+    delete:
+      tags: [Cart]
+      summary: Delete a cart order group
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CartOrderId'
+      responses:
+        '200':
+          description: Cart order deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartSuccessResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /cart/items:
+    post:
+      tags: [Cart]
+      summary: Add item to a specific cart dish group
+      description: |
+        Requires `order_id`.
+
+        This allows multiple child dish groups from same restaurant in one cart.
+        Quantity is integer-only in current backend contract.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddCartItemRequest'
+      responses:
+        '200':
+          description: Item added to cart order
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartSuccessResponse'
+        '400':
+          description: Invalid request, missing cart order, or menu item restaurant mismatch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /cart/items/{id}:
+    patch:
+      tags: [Cart]
+      summary: Update cart item quantity
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CartItemId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCartItemRequest'
+      responses:
+        '200':
+          description: Cart item updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartSuccessResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Cart]
+      summary: Delete item from cart
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CartItemId'
+      responses:
+        '200':
+          description: Cart item deleted. Empty order and empty cart cleanup may also occur.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartSuccessResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /cart/info:
+    patch:
+      tags: [Cart]
+      summary: Update cart rider note / order instructions
+      description: |
+        Customer-facing note field for delivery instructions, rider note, or order instructions.
+
+        Backend field name remains `user_info`, but frontend should treat it as the rider/order note field for current product flow.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCartInfoRequest'
+      responses:
+        '200':
+          description: Cart info updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartSuccessResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /cart/location:
+    patch:
+      tags: [Cart]
+      summary: Update cart selected location
+      description: |
+        Sets cart-level location for delivery pricing.
+
+        How to use:
+        1. Call `GET /locations` to fetch valid predefined locations.
+        2. Send chosen `location_id` in this request.
+        3. Cart totals will then use restaurant-specific delivery overrides for that location when present.
+        4. Send `null` to clear selected location.
+
+        Important:
+        - location belongs to cart, not individual orders
+        - if same restaurant appears in multiple cart orders, delivery is still charged once for that restaurant
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCartLocationRequest'
+            examples:
+              selectLocation:
+                summary: Select Lekki Phase 1 as cart location
+                value:
+                  location_id: 1
+              clearLocation:
+                summary: Clear selected location
+                value:
+                  location_id: null
+      responses:
+        '200':
+          description: Cart location updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartSuccessResponse'
+        '400':
+          description: Invalid request or location not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /cart/referral:
+    patch:
+      tags: [Cart]
+      summary: Update cart referral code
+      description: |
+        Sets or clears cart referral code.
+
+        Validation rules:
+        - non-empty code must exist in ambassadors table
+        - unknown code returns `400 invalid referral code`
+        - empty string or `null` clears referral from cart
+        - discount is applied once per cart only when stored referral code is valid
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCartReferralRequest'
+            examples:
+              setReferral:
+                value:
+                  referral_code: AMB001
+              clearReferralNull:
+                value:
+                  referral_code: null
+              clearReferralEmpty:
+                value:
+                  referral_code: ""
+      responses:
+        '200':
+          description: Cart referral updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartSuccessResponse'
+        '400':
+          description: Invalid request or invalid referral code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /cart/checkout:
+    post:
+      tags: [Cart]
+      summary: Deprecated frontend checkout route
+      description: |
+        Deprecated for frontend payment flow.
+
+        Frontend should use:
+        1. `POST /payments/initialize`
+        2. provider popup callback page
+        3. `POST /payments/verify`
+
+        This route now returns an error for frontend payment flow.
+      deprecated: true
+      security:
+        - bearerAuth: []
+      responses:
+        '400':
+          description: Deprecated route for frontend payment flow
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /orders/history:
+    get:
+      tags: [Order History]
+      summary: Get authenticated user order history
+      description: |
+        Returns previous checked-out carts for authenticated user.
+
+        Frontend reorder guidance:
+        - each history record represents one previously checked-out cart
+        - each nested `orders[]` entry represents one historical dish group
+        - use `restaurant_id`, `menu_item_id`, and `quantity` to rebuild a fresh cart with current cart endpoints
+        - do not reuse historical location from this payload for pricing; use current selected cart location instead
+
+        Availability flags:
+        - `can_reorder` is `true` only when every historical group contains items and all those items are still available
+        - `orders[].restaurant_exists` shows whether restaurant still exists
+        - `orders[].items[].exists` shows whether menu item still exists
+        - `orders[].items[].available` shows whether menu item still exists and is currently available
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Order history fetched successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderHistoryListSuccessResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /orders/history/{id}:
+    get:
+      tags: [Order History]
+      summary: Get one authenticated user order history entry
+      description: |
+        Returns one previous checked-out cart in full detail.
+
+        Useful when frontend wants one dedicated previous-order screen before rebuilding a new cart.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 12
+      responses:
+        '200':
+          description: Order history detail fetched successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderHistoryDetailSuccessResponse'
+        '400':
+          description: Invalid history id or history entry not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /restaurants:
+    get:
+      tags: [Public Discovery]
+      summary: List customer-facing restaurants
+      description: |
+        Public restaurant discovery endpoint for frontend home and browse screens.
+
+        Notes:
+        - returns only data safe for customer-facing read use
+        - several rich display fields may be `null` when backend has no stored value
+        - `supports_fractional_quantity` is currently `false`
+        - `quantity_step` is currently `1`
+      responses:
+        '200':
+          description: Restaurants fetched successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicRestaurantsSuccessResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /restaurants/{id}:
+    get:
+      tags: [Public Discovery]
+      summary: Get customer-facing restaurant detail
+      description: |
+        Public restaurant detail endpoint.
+
+        Use this for restaurant hero/header sections.
+        Menu may also be fetched separately through `GET /restaurants/{id}/menu`.
+      parameters:
+        - $ref: '#/components/parameters/RestaurantId'
+      responses:
+        '200':
+          description: Restaurant fetched successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicRestaurantDetailSuccessResponse'
+        '400':
+          description: Invalid restaurant id or restaurant not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /restaurants/{id}/menu:
+    get:
+      tags: [Public Discovery]
+      summary: Get customer-facing restaurant menu
+      description: |
+        Public restaurant menu endpoint.
+
+        Frontend may group menu items by `category_name` or `dish_type`.
+        Fractional quantity is not supported in current backend contract.
+      parameters:
+        - $ref: '#/components/parameters/RestaurantId'
+      responses:
+        '200':
+          description: Restaurant menu fetched successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicMenuItemsSuccessResponse'
+        '400':
+          description: Invalid restaurant id or restaurant not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /search:
+    get:
+      tags: [Public Discovery]
+      summary: Search restaurants and dishes
+      description: |
+        Lightweight customer-facing search endpoint.
+
+        Query behavior:
+        - searches restaurant names
+        - searches menu item names
+        - returns restaurant hits and dish hits separately
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+          example: rice
+      responses:
+        '200':
+          description: Search results fetched successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchSuccessResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /locations:
+    get:
+      tags: [Location]
+      summary: List available predefined locations
+      description: |
+        Public endpoint for app clients.
+
+        Use this before `PATCH /cart/location` so user can select one valid predefined location.
+        This feature is not GPS/map based. Returned locations are admin-managed fixed choices.
+      responses:
+        '200':
+          description: Locations fetched successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationsSuccessResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /location/:
+    get:
+      tags: [Location]
+      summary: List predefined locations (admin)
+      description: |
+        Admin listing of all predefined locations.
+
+        Typical use:
+        - fetch location IDs
+        - then create or update restaurant delivery overrides against those IDs
+      security:
+        - abidoShakerHeader: []
+      responses:
+        '200':
+          description: Locations fetched successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationsSuccessResponse'
+        '400':
+          description: Missing or invalid admin header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AbidoShakerErrorResponse'
+    post:
+      tags: [Location]
+      summary: Create predefined location
+      description: |
+        Creates one admin-managed fixed location option.
+
+        Example use cases:
+        - Lekki Phase 1
+        - Yaba
+        - Magodo
+
+        After creation, use returned `id` when setting restaurant location delivery overrides.
+      security:
+        - abidoShakerHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLocationRequest'
+            examples:
+              createLekki:
+                value:
+                  name: Lekki Phase 1
+      responses:
+        '200':
+          description: Location created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationSuccessResponse'
+        '400':
+          description: Invalid payload or missing admin header
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ErrorResponse'
+                  - $ref: '#/components/schemas/AbidoShakerErrorResponse'
+
+  /location/{id}:
+    patch:
+      tags: [Location]
+      summary: Update predefined location
+      description: Rename existing predefined location.
+      security:
+        - abidoShakerHeader: []
+      parameters:
+        - $ref: '#/components/parameters/LocationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLocationRequest'
+      responses:
+        '200':
+          description: Location updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationSuccessResponse'
+        '400':
+          description: Invalid payload, location not found, or missing admin header
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ErrorResponse'
+                  - $ref: '#/components/schemas/AbidoShakerErrorResponse'
+    delete:
+      tags: [Location]
+      summary: Delete predefined location
+      description: |
+        Deletes predefined location.
+
+        Current implementation also:
+        - clears `location_id` from carts using this location
+        - deletes restaurant-location override rows pointing to this location
+      security:
+        - abidoShakerHeader: []
+      parameters:
+        - $ref: '#/components/parameters/LocationId'
+      responses:
+        '200':
+          description: Location deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccessResponse'
+        '400':
+          description: Invalid location id, location not found, or missing admin header
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ErrorResponse'
+                  - $ref: '#/components/schemas/AbidoShakerErrorResponse'
+
+  /location-prices/restaurant/{id}:
+    get:
+      tags: [Location]
+      summary: List delivery price overrides for one restaurant
+      description: |
+        Returns all explicit delivery overrides for one restaurant.
+
+        Use this to inspect which locations already have custom prices.
+        If a location is missing from this list, cart pricing falls back to the restaurant default `delivery_fee` for that location.
+      security:
+        - abidoShakerHeader: []
+      parameters:
+        - $ref: '#/components/parameters/RestaurantId'
+      responses:
+        '200':
+          description: Restaurant location prices fetched successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestaurantLocationPricesSuccessResponse'
+        '400':
+          description: Invalid restaurant id, restaurant not found, or missing admin header
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ErrorResponse'
+                  - $ref: '#/components/schemas/AbidoShakerErrorResponse'
+
+  /location-prices/:
+    put:
+      tags: [Location]
+      summary: Create or update restaurant to location delivery price override
+      description: |
+        Sets delivery price override for one `(restaurant_id, location_id)` pair.
+
+        How to use:
+        1. Create or fetch location to get `location_id`.
+        2. Choose target restaurant `restaurant_id`.
+        3. Send `price` for that exact pair.
+
+        Upsert behavior:
+        - if pair does not exist, it is created
+        - if pair already exists, price is updated
+
+        Fallback rule:
+        - if no override exists for a restaurant and selected cart location, cart pricing uses restaurant default `delivery_fee`
+      security:
+        - abidoShakerHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpsertRestaurantLocationPriceRequest'
+            examples:
+              setLekkiPrice:
+                summary: Set Restaurant 1 delivery price to Lekki Phase 1
+                value:
+                  restaurant_id: 1
+                  location_id: 1
+                  price: 1500
+      responses:
+        '200':
+          description: Restaurant location price upserted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestaurantLocationPriceSuccessResponse'
+        '400':
+          description: Invalid payload, restaurant/location not found, or missing admin header
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ErrorResponse'
+                  - $ref: '#/components/schemas/AbidoShakerErrorResponse'
+
+  /location-prices/restaurant/{restaurant_id}/location/{location_id}:
+    delete:
+      tags: [Location]
+      summary: Delete restaurant to location delivery price override
+      description: |
+        Deletes explicit override for one `(restaurant_id, location_id)` pair.
+
+        After deletion, cart pricing falls back to restaurant default `delivery_fee` whenever that location is selected.
+      security:
+        - abidoShakerHeader: []
+      parameters:
+        - name: restaurant_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+        - name: location_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: Restaurant location price deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccessResponse'
+        '400':
+          description: Invalid ids, override not found, or missing admin header
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ErrorResponse'
+                  - $ref: '#/components/schemas/AbidoShakerErrorResponse'
+
+  /restaurant/:
+    get:
+      tags: [Restaurant]
+      summary: List restaurants
+      security:
+        - abidoShakerHeader: []
+      responses:
+        '200':
+          description: Restaurants fetched successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestaurantsSuccessResponse'
+        '400':
+          description: Missing or invalid admin header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AbidoShakerErrorResponse'
+    post:
+      tags: [Restaurant]
+      summary: Create restaurant
+      security:
+        - abidoShakerHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Restaurant'
+      responses:
+        '200':
+          description: Restaurant created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccessResponse'
+        '400':
+          description: Missing or invalid admin header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AbidoShakerErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /restaurant/{id}/menu:
+    get:
+      tags: [Restaurant]
+      summary: Get restaurant menu items
+      security:
+        - abidoShakerHeader: []
+      parameters:
+        - $ref: '#/components/parameters/RestaurantId'
+      responses:
+        '200':
+          description: Restaurant menu fetched successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MenuItemsSuccessResponse'
+        '400':
+          description: Missing or invalid admin header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AbidoShakerErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /restaurant/{id}:
+    patch:
+      tags: [Restaurant]
+      summary: Update restaurant
+      security:
+        - abidoShakerHeader: []
+      parameters:
+        - $ref: '#/components/parameters/RestaurantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Restaurant'
+      responses:
+        '200':
+          description: Restaurant updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccessResponse'
+        '400':
+          description: Missing or invalid admin header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AbidoShakerErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Restaurant]
+      summary: Delete restaurant
+      security:
+        - abidoShakerHeader: []
+      parameters:
+        - $ref: '#/components/parameters/RestaurantId'
+      responses:
+        '200':
+          description: Restaurant deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccessResponse'
+        '400':
+          description: Missing or invalid admin header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AbidoShakerErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /menu/{id}:
+    post:
+      tags: [Menu]
+      summary: Create menu item for restaurant
+      description: Path parameter is restaurant ID.
+      security:
+        - abidoShakerHeader: []
+      parameters:
+        - $ref: '#/components/parameters/RestaurantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MenuItem'
+      responses:
+        '200':
+          description: Menu item created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccessResponse'
+        '400':
+          description: Missing or invalid admin header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AbidoShakerErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    patch:
+      tags: [Menu]
+      summary: Update menu item
+      description: Path parameter is menu item ID.
+      security:
+        - abidoShakerHeader: []
+      parameters:
+        - $ref: '#/components/parameters/MenuItemId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MenuItem'
+      responses:
+        '200':
+          description: Menu item updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccessResponse'
+        '400':
+          description: Missing or invalid admin header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AbidoShakerErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Menu]
+      summary: Delete menu item
+      security:
+        - abidoShakerHeader: []
+      parameters:
+        - $ref: '#/components/parameters/MenuItemId'
+      responses:
+        '200':
+          description: Menu item deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccessResponse'
+        '400':
+          description: Missing or invalid admin header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AbidoShakerErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /referral/:
+    get:
+      tags: [Referral]
+      summary: List referral codes
+      security:
+        - abidoShakerHeader: []
+      responses:
+        '200':
+          description: Referral codes fetched successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AmbassadorsSuccessResponse'
+        '400':
+          description: Missing or invalid admin header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AbidoShakerErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [Referral]
+      summary: Create referral code
+      security:
+        - abidoShakerHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Ambassador'
+      responses:
+        '200':
+          description: Ambassador created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericSuccessResponse'
+        '400':
+          description: Missing or invalid admin header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AbidoShakerErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /referral/ambassadors/sales:
+    get:
+      tags: [Referral]
+      summary: Get ambassador sales within date range
+      security:
+        - abidoShakerHeader: []
+      parameters:
+        - name: start_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: '2026-04-01'
+        - name: end_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: '2026-04-30'
+      responses:
+        '200':
+          description: Ambassador sales fetched successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AmbassadorsSuccessResponse'
+        '400':
+          description: Invalid dates or missing admin header
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ErrorResponse'
+                  - $ref: '#/components/schemas/AbidoShakerErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /referral/orders/all:
+    get:
+      tags: [Referral]
+      summary: Get all orders
+      security:
+        - abidoShakerHeader: []
+      responses:
+        '200':
+          description: Orders fetched successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrdersSuccessResponse'
+        '400':
+          description: Missing or invalid admin header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AbidoShakerErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: token
+    abidoShakerHeader:
+      type: apiKey
+      in: header
+      name: abidoshaker
+      description: Existing admin/bot compatibility header. Current expected value is `secret`.
+
+  parameters:
+    RestaurantId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 1
+    MenuItemId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 1
+    CartItemId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 1
+    CartOrderId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 1
+    LocationId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 1
+
+  schemas:
+    ResponseBase:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success, error]
+        status_code:
+          type: integer
+        message:
+          type: string
+      required: [status, message]
+
+    GenericSuccessResponse:
+      allOf:
+        - $ref: '#/components/schemas/ResponseBase'
+        - type: object
+          properties:
+            status:
+              type: string
+              enum: [success]
+
+    ErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ResponseBase'
+        - type: object
+          properties:
+            status:
+              type: string
+              enum: [error]
+
+    AbidoShakerErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: I'm the liquid metal lemande sepre
+      required: [error]
+
+    TelegramAuthRequest:
+      type: object
+      properties:
+        init_data:
+          type: string
+          description: Telegram Mini App init data string
+      required: [init_data]
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        telegram_id:
+          type: integer
+          format: int64
+        username:
+          type: string
+          nullable: true
+        first_name:
+          type: string
+        last_name:
+          type: string
+          nullable: true
+        photo_url:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+      required: [id, telegram_id, first_name]
+
+    AuthResult:
+      type: object
+      properties:
+        access_token:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+      required: [access_token, user]
+
+    AuthSuccessResponse:
+      allOf:
+        - $ref: '#/components/schemas/ResponseBase'
+        - type: object
+          properties:
+            status:
+              type: string
+              enum: [success]
+            result:
+              $ref: '#/components/schemas/AuthResult'
+
+    UserSuccessResponse:
+      allOf:
+        - $ref: '#/components/schemas/ResponseBase'
+        - type: object
+          properties:
+            status:
+              type: string
+              enum: [success]
+            result:
+              $ref: '#/components/schemas/User'
+
+    Restaurant:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        image_url:
+          type: string
+          nullable: true
+          example: https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=1200&q=80
+        plate_price:
+          type: integer
+          format: int64
+        delivery_fee:
+          type: integer
+          format: int64
+        total_menu_items:
+          type: integer
+      required: [name]
+
+    MenuItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        image_url:
+          type: string
+          nullable: true
+          example: https://images.unsplash.com/photo-1604908176997-4317c43b0f4d?auto=format&fit=crop&w=1200&q=80
+        price:
+          type: integer
+        max_portion:
+          type: integer
+        dish_type:
+          type: string
+          enum: [main, side, drink, chicken]
+        status:
+          type: string
+          enum: [available, unavailable]
+      required: [name]
+
+    PublicRestaurant:
+      type: object
+      description: Customer-facing restaurant payload. Several display fields may be `null` when not backed by stored data.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        image_url:
+          type: string
+          nullable: true
+        plate_price:
+          type: integer
+          format: int64
+        delivery_fee:
+          type: integer
+          format: int64
+        total_menu_items:
+          type: integer
+        description:
+          type: string
+          nullable: true
+        cuisine:
+          type: string
+          nullable: true
+        rating:
+          type: number
+          format: float
+          nullable: true
+        is_open:
+          type: boolean
+          nullable: true
+        delivery_time_text:
+          type: string
+          nullable: true
+        supports_fractional_quantity:
+          type: boolean
+          example: false
+        quantity_step:
+          type: number
+          format: float
+          example: 1
+        promo_text:
+          type: string
+          nullable: true
+      required: [id, name, plate_price, delivery_fee, total_menu_items, supports_fractional_quantity, quantity_step]
+
+    PublicMenuItem:
+      type: object
+      description: Customer-facing menu item payload. Fractional quantity is currently unsupported.
+      properties:
+        id:
+          type: integer
+        restaurant_id:
+          type: integer
+        name:
+          type: string
+        image_url:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        price:
+          type: integer
+        max_portion:
+          type: integer
+        dish_type:
+          type: string
+          enum: [main, side, drink, chicken]
+        category_name:
+          type: string
+          example: Main Dishes
+        status:
+          type: string
+          enum: [available, unavailable]
+        supports_fractional_quantity:
+          type: boolean
+          example: false
+        quantity_step:
+          type: number
+          format: float
+          example: 1
+      required: [id, restaurant_id, name, price, max_portion, dish_type, category_name, status, supports_fractional_quantity, quantity_step]
+
+    PublicRestaurantDetail:
+      type: object
+      properties:
+        restaurant:
+          $ref: '#/components/schemas/PublicRestaurant'
+        menu:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicMenuItem'
+      required: [restaurant, menu]
+
+    SearchDishResult:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        image_url:
+          type: string
+          nullable: true
+        price:
+          type: integer
+        dish_type:
+          type: string
+        restaurant:
+          $ref: '#/components/schemas/PublicRestaurant'
+        category_name:
+          type: string
+      required: [id, name, price, dish_type, restaurant, category_name]
+
+    SearchResult:
+      type: object
+      properties:
+        query:
+          type: string
+        restaurants:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicRestaurant'
+        dishes:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchDishResult'
+      required: [query, restaurants, dishes]
+
+    Ambassador:
+      type: object
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+          nullable: true
+        sales_count:
+          type: integer
+          format: int64
+          nullable: true
+      required: [code]
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: integer
+        restaurant_id:
+          type: integer
+        user_id:
+          type: integer
+          format: int64
+        paid_status:
+          type: string
+        status:
+          type: string
+        user_info:
+          type: string
+          nullable: true
+        referral_code:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+      required: [id, restaurant_id, user_id, paid_status, status, created_at]
+
+    OrderHistoryOrderItem:
+      type: object
+      properties:
+        order_item_id:
+          type: integer
+        menu_item_id:
+          type: integer
+        name:
+          type: string
+          nullable: true
+        image_url:
+          type: string
+          nullable: true
+        quantity:
+          type: integer
+        exists:
+          type: boolean
+        available:
+          type: boolean
+      required: [order_item_id, menu_item_id, quantity, exists, available]
+
+    OrderHistoryGroup:
+      type: object
+      properties:
+        id:
+          type: integer
+        restaurant_id:
+          type: integer
+        restaurant:
+          allOf:
+            - $ref: '#/components/schemas/Restaurant'
+          nullable: true
+        restaurant_exists:
+          type: boolean
+        all_items_available:
+          type: boolean
+        available_item_count:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderHistoryOrderItem'
+      required: [id, restaurant_id, restaurant_exists, all_items_available, available_item_count, items]
+
+    OrderHistoryItem:
+      type: object
+      description: One previous checked-out cart returned as order history entry.
+      properties:
+        id:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        can_reorder:
+          type: boolean
+        orders:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderHistoryGroup'
+      required: [id, created_at, can_reorder, orders]
+
+    Location:
+      type: object
+      description: One predefined admin-managed location option that users may select for their cart.
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Lekki Phase 1
+      required: [id, name]
+
+    RestaurantLocationPrice:
+      type: object
+      description: Explicit delivery price override for one restaurant and one predefined location.
+      properties:
+        id:
+          type: integer
+          example: 7
+        restaurant_id:
+          type: integer
+          example: 1
+        location_id:
+          type: integer
+          example: 1
+        price:
+          type: integer
+          format: int64
+          example: 1500
+        location:
+          $ref: '#/components/schemas/Location'
+      required: [id, restaurant_id, location_id, price, location]
+
+    CartSummary:
+      type: object
+      description: |
+        Pricing summary.
+
+        Scope rules:
+        - `handling_fee` and `surcharge` are summed from child orders
+        - `extra_order_charge` is charged once per extra child order after first
+        - `delivery_fee` is summed once per unique restaurant in cart
+        - `transaction_fee` is applied once per cart
+        - `service_charge` is applied once per cart
+        - `discount` is applied once per cart
+      properties:
+        items_total:
+          type: integer
+          example: 5200
+        delivery_fee:
+          type: integer
+          example: 2500
+        handling_fee:
+          type: integer
+          example: 300
+        surcharge:
+          type: integer
+          example: 550
+        extra_order_charge:
+          type: integer
+          example: 300
+        transaction_fee:
+          type: integer
+          example: 50
+        service_charge:
+          type: integer
+          example: 500
+        discount:
+          type: integer
+          example: 100
+        sub_total:
+          type: integer
+          example: 9400
+        total:
+          type: integer
+          example: 9300
+      required: [items_total, delivery_fee, handling_fee, surcharge, extra_order_charge, transaction_fee, service_charge, discount, sub_total, total]
+
+    CartItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        quantity:
+          type: integer
+        item:
+          $ref: '#/components/schemas/MenuItem'
+      required: [id, quantity, item]
+
+    CartOrder:
+      type: object
+      properties:
+        id:
+          type: integer
+        cart_id:
+          type: integer
+          nullable: true
+        restaurant_id:
+          type: integer
+        restaurant:
+          $ref: '#/components/schemas/Restaurant'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartItem'
+        paid_status:
+          type: string
+        status:
+          type: string
+        user_info:
+          type: string
+          nullable: true
+        referral_code:
+          type: string
+          nullable: true
+        summary:
+          $ref: '#/components/schemas/CartSummary'
+      required: [id, restaurant_id, restaurant, items, paid_status, status, summary]
+
+    Cart:
+      type: object
+      description: |
+        User-owned cart.
+
+        `location_id` and `location` represent selected predefined location for whole cart.
+        All child orders use this same cart location for delivery pricing.
+      properties:
+        id:
+          type: integer
+          example: 12
+        user_id:
+          type: integer
+          example: 3
+        location_id:
+          type: integer
+          nullable: true
+          example: 1
+        location:
+          allOf:
+            - $ref: '#/components/schemas/Location'
+          nullable: true
+        referral_code:
+          type: string
+          nullable: true
+          example: AMB001
+        user_info:
+          type: string
+          nullable: true
+          example: No pepper please
+        payment_locked:
+          type: boolean
+          example: false
+        status:
+          type: string
+          enum: [active, checked_out]
+        orders:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartOrder'
+        summary:
+          $ref: '#/components/schemas/CartSummary'
+      required: [id, user_id, payment_locked, status, orders, summary]
+
+    CreateCartOrderRequest:
+      type: object
+      properties:
+        restaurant_id:
+          type: integer
+      required: [restaurant_id]
+
+    AddCartItemRequest:
+      type: object
+      properties:
+        order_id:
+          type: integer
+        menu_item_id:
+          type: integer
+        quantity:
+          type: integer
+          default: 1
+      required: [order_id, menu_item_id]
+
+    UpdateCartItemRequest:
+      type: object
+      description: Integer-only quantity update. Fractional or half-step quantity is not supported in current backend contract.
+      properties:
+        quantity:
+          type: integer
+          example: 2
+      required: [quantity]
+
+    UpdateCartInfoRequest:
+      type: object
+      properties:
+        user_info:
+          type: string
+          nullable: true
+
+    UpdateCartLocationRequest:
+      type: object
+      description: Set or clear selected predefined cart location.
+      properties:
+        location_id:
+          type: integer
+          nullable: true
+          example: 1
+
+    UpdateCartReferralRequest:
+      type: object
+      properties:
+        referral_code:
+          type: string
+          nullable: true
+
+    InitializePaymentRequest:
+      type: object
+      properties:
+        cart_id:
+          type: integer
+          example: 12
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        callback_url:
+          type: string
+          example: https://app.example.com/payments/callback
+      required: [cart_id, email, callback_url]
+
+    VerifyPaymentRequest:
+      type: object
+      properties:
+        reference:
+          type: string
+          example: pay_1_1746212345
+      required: [reference]
+
+    CancelPaymentRequest:
+      type: object
+      properties:
+        reference:
+          type: string
+          example: pay_1_1746212345
+      required: [reference]
+
+    Payment:
+      type: object
+      properties:
+        id:
+          type: integer
+        cart_id:
+          type: integer
+        user_id:
+          type: integer
+        provider:
+          type: string
+          example: paystack
+        reference:
+          type: string
+        status:
+          type: string
+          enum: [initialized, pending, success, failed, cancelled, expired]
+        amount:
+          type: integer
+          format: int64
+        currency:
+          type: string
+          example: NGN
+        email:
+          type: string
+          format: email
+        authorization_url:
+          type: string
+          nullable: true
+        access_code:
+          type: string
+          nullable: true
+        callback_url:
+          type: string
+          nullable: true
+        paid_at:
+          type: string
+          nullable: true
+          format: date-time
+      required: [id, cart_id, user_id, provider, reference, status, amount, currency, email]
+
+    PaymentInitializeResult:
+      type: object
+      properties:
+        provider:
+          type: string
+          example: paystack
+        reference:
+          type: string
+        authorization_url:
+          type: string
+          nullable: true
+        access_code:
+          type: string
+          nullable: true
+        amount:
+          type: integer
+          format: int64
+        currency:
+          type: string
+        email:
+          type: string
+          format: email
+        status:
+          type: string
+          enum: [initialized, pending, success, failed, cancelled, expired]
+      required: [provider, reference, amount, currency, email, status]
+
+    CreateLocationRequest:
+      type: object
+      description: Create one predefined location option.
+      properties:
+        name:
+          type: string
+          example: Lekki Phase 1
+      required: [name]
+
+    UpdateLocationRequest:
+      type: object
+      description: Rename one predefined location option.
+      properties:
+        name:
+          type: string
+          example: Lekki Phase 1 Gate 2
+      required: [name]
+
+    UpsertRestaurantLocationPriceRequest:
+      type: object
+      description: Create or update delivery override for one restaurant and one predefined location.
+      properties:
+        restaurant_id:
+          type: integer
+          example: 1
+        location_id:
+          type: integer
+          example: 1
+        price:
+          type: integer
+          format: int64
+          example: 1500
+      required: [restaurant_id, location_id, price]
+
+    RestaurantsSuccessResponse:
+      allOf:
+        - $ref: '#/components/schemas/ResponseBase'
+        - type: object
+          properties:
+            status:
+              type: string
+              enum: [success]
+            result:
+              type: array
+              items:
+                $ref: '#/components/schemas/Restaurant'
+
+    MenuItemsSuccessResponse:
+      allOf:
+        - $ref: '#/components/schemas/ResponseBase'
+        - type: object
+          properties:
+            status:
+              type: string
+              enum: [success]
+            result:
+              type: array
+              items:
+                $ref: '#/components/schemas/MenuItem'
+
+    AmbassadorsSuccessResponse:
+      allOf:
+        - $ref: '#/components/schemas/ResponseBase'
+        - type: object
+          properties:
+            status:
+              type: string
+              enum: [success]
+            result:
+              type: array
+              items:
+                $ref: '#/components/schemas/Ambassador'
+
+    OrdersSuccessResponse:
+      allOf:
+        - $ref: '#/components/schemas/ResponseBase'
+        - type: object
+          properties:
+            status:
+              type: string
+              enum: [success]
+            result:
+              type: array
+              items:
+                $ref: '#/components/schemas/Order'
+
+    OrderHistoryListSuccessResponse:
+      allOf:
+        - $ref: '#/components/schemas/ResponseBase'
+        - type: object
+          properties:
+            status:
+              type: string
+              enum: [success]
+            result:
+              type: array
+              items:
+                $ref: '#/components/schemas/OrderHistoryItem'
+
+    OrderHistoryDetailSuccessResponse:
+      allOf:
+        - $ref: '#/components/schemas/ResponseBase'
+        - type: object
+          properties:
+            status:
+              type: string
+              enum: [success]
+            result:
+              $ref: '#/components/schemas/OrderHistoryItem'
+
+    PaymentInitializeSuccessResponse:
+      allOf:
+        - $ref: '#/components/schemas/ResponseBase'
+        - type: object
+          properties:
+            status:
+              type: string
+              enum: [success]
+            result:
+              $ref: '#/components/schemas/PaymentInitializeResult'
+
+    PaymentSuccessResponse:
+      allOf:
+        - $ref: '#/components/schemas/ResponseBase'
+        - type: object
+          properties:
+            status:
+              type: string
+              enum: [success]
+            result:
+              $ref: '#/components/schemas/Payment'
+
+    PublicRestaurantsSuccessResponse:
+      allOf:
+        - $ref: '#/components/schemas/ResponseBase'
+        - type: object
+          properties:
+            status:
+              type: string
+              enum: [success]
+            result:
+              type: array
+              items:
+                $ref: '#/components/schemas/PublicRestaurant'
+
+    PublicRestaurantDetailSuccessResponse:
+      allOf:
+        - $ref: '#/components/schemas/ResponseBase'
+        - type: object
+          properties:
+            status:
+              type: string
+              enum: [success]
+            result:
+              $ref: '#/components/schemas/PublicRestaurantDetail'
+
+    PublicMenuItemsSuccessResponse:
+      allOf:
+        - $ref: '#/components/schemas/ResponseBase'
+        - type: object
+          properties:
+            status:
+              type: string
+              enum: [success]
+            result:
+              type: array
+              items:
+                $ref: '#/components/schemas/PublicMenuItem'
+
+    SearchSuccessResponse:
+      allOf:
+        - $ref: '#/components/schemas/ResponseBase'
+        - type: object
+          properties:
+            status:
+              type: string
+              enum: [success]
+            result:
+              $ref: '#/components/schemas/SearchResult'
+
+    LocationsSuccessResponse:
+      allOf:
+        - $ref: '#/components/schemas/ResponseBase'
+        - type: object
+          properties:
+            status:
+              type: string
+              enum: [success]
+            result:
+              type: array
+              items:
+                $ref: '#/components/schemas/Location'
+
+    LocationSuccessResponse:
+      allOf:
+        - $ref: '#/components/schemas/ResponseBase'
+        - type: object
+          properties:
+            status:
+              type: string
+              enum: [success]
+            result:
+              $ref: '#/components/schemas/Location'
+
+    RestaurantLocationPricesSuccessResponse:
+      allOf:
+        - $ref: '#/components/schemas/ResponseBase'
+        - type: object
+          properties:
+            status:
+              type: string
+              enum: [success]
+            result:
+              type: array
+              items:
+                $ref: '#/components/schemas/RestaurantLocationPrice'
+
+    RestaurantLocationPriceSuccessResponse:
+      allOf:
+        - $ref: '#/components/schemas/ResponseBase'
+        - type: object
+          properties:
+            status:
+              type: string
+              enum: [success]
+            result:
+              $ref: '#/components/schemas/RestaurantLocationPrice'
+
+    CartSuccessResponse:
+      allOf:
+        - $ref: '#/components/schemas/ResponseBase'
+        - type: object
+          properties:
+            status:
+              type: string
+              enum: [success]
+            result:
+              nullable: true
+              allOf:
+                - $ref: '#/components/schemas/Cart'

@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Choplink Review Deck</title>
+    <style>
+      :root { --bg: #0f0f12; --surface: #18181d; --text: #ffffff; --muted: #b6b6c2; --accent: #e53935; }
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: Inter, system-ui, sans-serif; background: var(--bg); color: var(--text); }
+      .deck { display: grid; gap: 24px; padding: 24px; width: min(1200px, 100%); margin: 0 auto; }
+      .slide { background: linear-gradient(180deg, rgba(229,57,53,0.12), rgba(255,255,255,0.02)); border: 1px solid rgba(255,255,255,0.08); border-radius: 24px; padding: 24px; }
+      h1, h2, h3, p { margin: 0 0 12px; }
+      .eyebrow { text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-size: 12px; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+      .metric { background: rgba(255,255,255,0.03); border-radius: 16px; padding: 16px; }
+      ul { margin: 0; padding-left: 20px; color: var(--muted); }
+      video { width: 100%; border-radius: 18px; background: #000; min-height: 240px; }
+      code { background: rgba(255,255,255,0.08); border-radius: 8px; padding: 2px 6px; }
+      .meta { color: var(--muted); font-size: 14px; }
+      a { color: #ffb4b2; }
+    </style>
+  </head>
+  <body>
+    <main class="deck">
+      <section class="slide">
+        <p class="eyebrow">Choplink</p>
+        <h1>Telegram Mini App Rewrite Review</h1>
+        <p class="meta">Generated evidence deck for PRD/UI compliance review.</p>
+        <div class="grid">
+          <div class="metric"><h3>Videos</h3><p>6</p></div>
+          <div class="metric"><h3>Traces</h3><p>6</p></div>
+          <div class="metric"><h3>Screenshots</h3><p>0</p></div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <p class="eyebrow">Delivered</p>
+        <h2>MVP Feature Coverage</h2>
+        <ul>
+          <li>Restaurant discovery with skeleton loading and lazy-loaded images</li>
+          <li>Search across dishes and restaurants</li>
+          <li>Menu browsing with inline quantity stepper and multi-dish ordering</li>
+          <li>Floating cart bar and editable cart</li>
+          <li>Checkout with location-based pricing dropdown and rider note</li>
+          <li>Embedded mock Paystack payment success/failure</li>
+          <li>Success screen, stored order history, and re-order shortcuts</li>
+          <li>Telegram-style BackButton/MainButton fallback</li>
+        </ul>
+      </section>
+
+      <section class="slide">
+        <p class="eyebrow">Artifacts</p>
+        <h2>Reference Paths</h2>
+        <ul>
+          <li>Implementation plan: <code>../.pi/product/implementation.md</code></li>
+          <li>PRD: <code>../.pi/product/prd.md</code></li>
+          <li>UI Decisions: <code>../.pi/product/ui.md</code></li>
+          <li>Playwright report: <code>../playwright-report/index.html</code></li>
+        </ul>
+      </section>
+
+      
+        <section class="slide">
+          <p class="eyebrow">Evidence 1</p>
+          <h2>app-Choplink-Telegram-Mini-3ab1e-inds-dishes-and-restaurants-chromium</h2>
+          <video controls preload="metadata" src="../test-results/app-Choplink-Telegram-Mini-3ab1e-inds-dishes-and-restaurants-chromium/video.webm"></video>
+          <p class="meta">Video: ../test-results/app-Choplink-Telegram-Mini-3ab1e-inds-dishes-and-restaurants-chromium/video.webm</p>
+        </section>
+
+        <section class="slide">
+          <p class="eyebrow">Evidence 2</p>
+          <h2>app-Choplink-Telegram-Mini-3b4bc-iscovery-to-payment-success-chromium</h2>
+          <video controls preload="metadata" src="../test-results/app-Choplink-Telegram-Mini-3b4bc-iscovery-to-payment-success-chromium/video.webm"></video>
+          <p class="meta">Video: ../test-results/app-Choplink-Telegram-Mini-3b4bc-iscovery-to-payment-success-chromium/video.webm</p>
+        </section>
+
+        <section class="slide">
+          <p class="eyebrow">Evidence 3</p>
+          <h2>app-Choplink-Telegram-Mini-5c466-urant-blocks-item-selection-chromium</h2>
+          <video controls preload="metadata" src="../test-results/app-Choplink-Telegram-Mini-5c466-urant-blocks-item-selection-chromium/video.webm"></video>
+          <p class="meta">Video: ../test-results/app-Choplink-Telegram-Mini-5c466-urant-blocks-item-selection-chromium/video.webm</p>
+        </section>
+
+        <section class="slide">
+          <p class="eyebrow">Evidence 4</p>
+          <h2>app-Choplink-Telegram-Mini-78c2c-revious-order-restores-cart-chromium</h2>
+          <video controls preload="metadata" src="../test-results/app-Choplink-Telegram-Mini-78c2c-revious-order-restores-cart-chromium/video.webm"></video>
+          <p class="meta">Video: ../test-results/app-Choplink-Telegram-Mini-78c2c-revious-order-restores-cart-chromium/video.webm</p>
+        </section>
+
+        <section class="slide">
+          <p class="eyebrow">Evidence 5</p>
+          <h2>app-Choplink-Telegram-Mini-a9861-s-in-app-and-shows-feedback-chromium</h2>
+          <video controls preload="metadata" src="../test-results/app-Choplink-Telegram-Mini-a9861-s-in-app-and-shows-feedback-chromium/video.webm"></video>
+          <p class="meta">Video: ../test-results/app-Choplink-Telegram-Mini-a9861-s-in-app-and-shows-feedback-chromium/video.webm</p>
+        </section>
+
+        <section class="slide">
+          <p class="eyebrow">Evidence 6</p>
+          <h2>app-Choplink-Telegram-Mini-d0b71-art-route-guards-empty-cart-chromium</h2>
+          <video controls preload="metadata" src="../test-results/app-Choplink-Telegram-Mini-d0b71-art-route-guards-empty-cart-chromium/video.webm"></video>
+          <p class="meta">Video: ../test-results/app-Choplink-Telegram-Mini-d0b71-art-route-guards-empty-cart-chromium/video.webm</p>
+        </section>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+:root {
+  --bg: var(--tg-bg, #ffffff);
+  --text: var(--tg-text, #111111);
+  --button: var(--tg-button, #c84b4b);
+  --button-text: var(--tg-button-text, #ffffff);
+  --surface: var(--tg-secondary-bg, #f7f7f8);
+  --surface-strong: color-mix(in srgb, var(--bg) 92%, white 8%);
+  --surface-muted: color-mix(in srgb, var(--surface) 88%, var(--bg) 12%);
+  --border: color-mix(in srgb, var(--text) 12%, var(--bg) 88%);
+  --muted: var(--tg-hint, #6d625d);
+  --shadow-sm: 0 2px 8px rgba(17, 17, 17, 0.05);
+  --shadow-md: 0 8px 20px rgba(17, 17, 17, 0.08);
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 6px;
+  --radius-pill: 6px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
