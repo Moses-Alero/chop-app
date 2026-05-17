@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, Mail, MapPin, Receipt, StickyNote, TicketPercent } from 'lucide-react'
+import { ChevronDown, ChevronUp, Mail, MapPin, Phone, Receipt, StickyNote, TicketPercent } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { PageHeader } from '../components/PageHeader'
@@ -31,6 +31,7 @@ export function CheckoutPage() {
     checkout,
     locationId,
     locationNote,
+    phoneNumber,
     referralCode,
     mode,
     applyReferralCode,
@@ -38,6 +39,7 @@ export function CheckoutPage() {
     saveCheckoutInfo,
     setLocationId,
     setLocationNote,
+    setPhoneNumber,
     setReferralCode,
     syncing,
     setPendingCheckoutCart,
@@ -63,6 +65,7 @@ export function CheckoutPage() {
   }, [user?.email])
 
   const locationError = !locationId ? 'Select delivery area' : null
+  const phoneError = !phoneNumber.trim() ? 'Phone number required' : null
   const noteError = !locationNote.trim() ? 'Add delivery note for rider' : null
   const emailError = !email.trim()
     ? 'Email required for payment'
@@ -75,6 +78,7 @@ export function CheckoutPage() {
   const paymentLockedReason = mode === 'backend' && cart.paymentLocked ? 'Payment in progress. Continue or cancel existing payment.' : null
   const blockedReason = paymentLockedReason
     ?? locationError
+    ?? phoneError
     ?? noteError
     ?? emailError
     ?? (mode === 'backend' && !isAuthenticated && !authLoading ? 'Authentication required before checkout' : null)
@@ -126,6 +130,7 @@ export function CheckoutPage() {
         ...cart,
         locationId: locationId || null,
         locationNote,
+        phoneNumber,
         referralCode: referralCode.trim() || null,
       })
 
@@ -178,6 +183,7 @@ export function CheckoutPage() {
       <section className="card checkout-summary-card">
         <SectionHeader eyebrow="Checkout" title={mode === 'backend' ? 'Confirm details and pay' : 'Confirm delivery details'} />
         <p className="helper">Add payment email, confirm delivery details, pay.</p>
+        {cart.code ? <p className="helper"><strong>Order code:</strong> {cart.code}</p> : null}
       </section>
 
       {cart.paymentLocked ? (
@@ -207,6 +213,26 @@ export function CheckoutPage() {
           aria-invalid={Boolean(emailError)}
         />
         {emailError ? <p className="helper error-text">{emailError}</p> : <p className="helper">Required for payment.</p>}
+      </section>
+
+      <section className="card form-card">
+        <label htmlFor="checkout-phone" className="field-label icon-label icon-label--start">
+          <Phone size={14} />
+          <span>Phone number</span>
+        </label>
+        <input
+          id="checkout-phone"
+          className={`text-input ${phoneError ? 'text-input--error' : ''}`.trim()}
+          value={phoneNumber}
+          onChange={(event) => setPhoneNumber(event.target.value)}
+          placeholder="08012345678"
+          type="tel"
+          inputMode="tel"
+          autoComplete="tel"
+          aria-invalid={Boolean(phoneError)}
+          disabled={cart.paymentLocked}
+        />
+        {phoneError ? <p className="helper error-text">{phoneError}</p> : null }
       </section>
 
       <section className="card form-card">
@@ -262,7 +288,7 @@ export function CheckoutPage() {
           data-testid="delivery-location-note"
           disabled={cart.paymentLocked}
         />
-        {noteError ? <p className="helper error-text">{noteError}</p> : <p className="helper">Saved to backend as `user_info`.</p>}
+        {noteError ? <p className="helper error-text">{noteError}</p> : null}
       </section>
 
       <section className="card form-card referral-card">

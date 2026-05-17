@@ -227,12 +227,14 @@ export function evaluateCart(draft: CartDraft): Cart {
 
   return {
     id: 'cart-dev',
+    code: '#DEV-CART',
     restaurantId: restaurant?.id ?? null,
     restaurantName: restaurant?.name ?? null,
     locationId: draft.locationId || null,
     locationLabel: zone?.label ?? null,
     referralCode: null,
     locationNote: draft.locationNote || null,
+    phoneNumber: draft.phoneNumber || null,
     status: 'active',
     dishes,
     items: lines,
@@ -260,6 +262,7 @@ export async function previewCheckout(draft: CartDraft): Promise<CheckoutPreview
 
   const zone = getDeliveryZoneById(draft.locationId)
   if (!zone) createError('INVALID_LOCATION', 'Select delivery area')
+  if (!draft.phoneNumber.trim()) createError('INVALID_LOCATION', 'Add phone number')
   if (!draft.locationNote.trim()) createError('INVALID_LOCATION', 'Add delivery note for rider')
 
   const cart = evaluateCart(draft)
@@ -277,6 +280,7 @@ export async function createOrder(input: { draft: CartDraft }): Promise<Order> {
 
   const zone = getDeliveryZoneById(input.draft.locationId)
   if (!zone) createError('INVALID_LOCATION', 'Select delivery area')
+  if (!input.draft.phoneNumber.trim()) createError('INVALID_LOCATION', 'Add phone number')
   if (!input.draft.locationNote.trim()) createError('INVALID_LOCATION', 'Add delivery note for rider')
 
   const restaurant = getRestaurantById(cart.restaurantId)

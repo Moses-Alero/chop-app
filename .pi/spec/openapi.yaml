@@ -412,7 +412,11 @@ paths:
         Requires `order_id`.
 
         This allows multiple child dish groups from same restaurant in one cart.
-        Quantity is integer-only in current backend contract.
+
+        Quantity rules:
+        - minimum quantity is `1`
+        - restaurants with `supports_fractional_quantity = false` accept whole-number quantities only
+        - restaurants with `supports_fractional_quantity = true` accept quantities in `0.5` steps starting from `1`
       security:
         - bearerAuth: []
       requestBody:
@@ -757,8 +761,8 @@ paths:
         Notes:
         - returns only data safe for customer-facing read use
         - several rich display fields may be `null` when backend has no stored value
-        - `supports_fractional_quantity` is currently `false`
-        - `quantity_step` is currently `1`
+        - `supports_fractional_quantity` indicates whether restaurant accepts half-step quantity updates
+        - `quantity_step` is `0.5` when fractional quantities are supported, otherwise `1`
       responses:
         '200':
           description: Restaurants fetched successfully
@@ -1644,6 +1648,9 @@ components:
         delivery_fee:
           type: integer
           format: int64
+        supports_fractional_quantity:
+          type: boolean
+          example: false
         total_menu_items:
           type: integer
       required: [name]
@@ -1720,7 +1727,7 @@ components:
 
     PublicMenuItem:
       type: object
-      description: Customer-facing menu item payload. Fractional quantity is currently unsupported.
+      description: Customer-facing menu item payload. Fractional quantity support inherits from the owning restaurant.
       properties:
         id:
           type: integer
@@ -1854,7 +1861,9 @@ components:
           type: string
           nullable: true
         quantity:
-          type: integer
+          type: number
+          format: float
+          example: 1.5
         exists:
           type: boolean
         available:
@@ -1985,7 +1994,9 @@ components:
         id:
           type: integer
         quantity:
-          type: integer
+          type: number
+          format: float
+          example: 1.5
         item:
           $ref: '#/components/schemas/MenuItem'
       required: [id, quantity, item]
@@ -2025,12 +2036,17 @@ components:
       description: |
         User-owned cart.
 
+        `code` is master order code frontend can display to user for order identification.
+
         `location_id` and `location` represent selected predefined location for whole cart.
         All child orders use this same cart location for delivery pricing.
       properties:
         id:
           type: integer
           example: 12
+        code:
+          type: string
+          example: "#482193"
         user_id:
           type: integer
           example: 3
@@ -2062,7 +2078,7 @@ components:
             $ref: '#/components/schemas/CartOrder'
         summary:
           $ref: '#/components/schemas/CartSummary'
-      required: [id, user_id, payment_locked, status, orders, summary]
+      required: [id, code, user_id, payment_locked, status, orders, summary]
 
     CreateCartOrderRequest:
       type: object
@@ -2073,23 +2089,37 @@ components:
 
     AddCartItemRequest:
       type: object
+      description: |
+        Quantity rules depend on the target order's restaurant.
+
+        - minimum quantity is `1`
+        - if restaurant supports fractional quantities, valid examples are `1`, `1.5`, `2`
+        - otherwise quantity must be a whole number
       properties:
         order_id:
           type: integer
         menu_item_id:
           type: integer
         quantity:
-          type: integer
+          type: number
+          format: float
           default: 1
+          example: 1.5
       required: [order_id, menu_item_id]
 
     UpdateCartItemRequest:
       type: object
-      description: Integer-only quantity update. Fractional or half-step quantity is not supported in current backend contract.
+      description: |
+        Quantity rules depend on the target order's restaurant.
+
+        - minimum quantity is `1`
+        - if restaurant supports fractional quantities, quantity must be in `0.5` steps
+        - otherwise quantity must be a whole number
       properties:
         quantity:
-          type: integer
-          example: 2
+          type: number
+          format: float
+          example: 1.5
       required: [quantity]
 
     UpdateCartInfoRequest:

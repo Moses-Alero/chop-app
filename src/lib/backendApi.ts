@@ -161,6 +161,7 @@ type ApiCartOrder = {
 
 type ApiCart = {
   id: number;
+  code: string;
   location_id?: number | null;
   location?: ApiLocation | null;
   referral_code?: string | null;
@@ -201,12 +202,14 @@ type ApiPayment = {
 function emptyCart(): Cart {
   return {
     id: "cart-empty",
+    code: null,
     restaurantId: null,
     restaurantName: null,
     locationId: null,
     locationLabel: null,
     referralCode: null,
     locationNote: null,
+    phoneNumber: null,
     status: "active",
     dishes: [],
     items: [],
@@ -429,6 +432,55 @@ function mapLocation(input: ApiLocation): DeliveryZone {
   };
 }
 
+export function parseCartUserInfo(input: string | null | undefined): {
+  phoneNumber: string | null;
+  locationNote: string | null;
+} {
+  const value = input?.trim() ?? "";
+  if (!value) {
+    return {
+      phoneNumber: null,
+      locationNote: null,
+    };
+  }
+
+  const phoneAndNoteMatch = value.match(/^Phone:\s*(.+?)(?:\nNote:\s*([\s\S]*))?$/);
+  if (phoneAndNoteMatch) {
+    return {
+      phoneNumber: phoneAndNoteMatch[1]?.trim() || null,
+      locationNote: phoneAndNoteMatch[2]?.trim() || null,
+    };
+  }
+
+  const noteMatch = value.match(/^Note:\s*([\s\S]*)$/);
+  if (noteMatch) {
+    return {
+      phoneNumber: null,
+      locationNote: noteMatch[1]?.trim() || null,
+    };
+  }
+
+  return {
+    phoneNumber: null,
+    locationNote: value,
+  };
+}
+
+export function buildCartUserInfo(
+  phoneNumber: string | null | undefined,
+  locationNote: string | null | undefined,
+): string {
+  const trimmedPhoneNumber = phoneNumber?.trim() ?? "";
+  const trimmedLocationNote = locationNote?.trim() ?? "";
+
+  if (trimmedPhoneNumber && trimmedLocationNote) {
+    return `Phone: ${trimmedPhoneNumber}\nNote: ${trimmedLocationNote}`;
+  }
+
+  if (trimmedPhoneNumber) return `Phone: ${trimmedPhoneNumber}`;
+  return trimmedLocationNote;
+}
+
 function mapPricing(input: ApiCartSummary): CartPricingSummary {
   return {
     itemsTotal: moneyOrZero(input.items_total),
@@ -447,6 +499,7 @@ function mapPricing(input: ApiCartSummary): CartPricingSummary {
 function mapCart(input: ApiCart | null): Cart {
   if (!input) return emptyCart();
 
+  const userInfo = parseCartUserInfo(input.user_info);
   const dishes = input.orders.map((order, index): CartDish => {
     const label = `Dish ${index + 1}`;
     const items = order.items.map(
@@ -481,6 +534,7 @@ function mapCart(input: ApiCart | null): Cart {
 
   return {
     id: String(input.id),
+    code: input.code,
     restaurantId:
       input.orders.length === 1
         ? String(input.orders[0].restaurant_id)
@@ -494,7 +548,8 @@ function mapCart(input: ApiCart | null): Cart {
     locationId: input.location_id ? String(input.location_id) : null,
     locationLabel: input.location?.name ?? null,
     referralCode: input.referral_code ?? null,
-    locationNote: input.user_info ?? null,
+    locationNote: userInfo.locationNote,
+    phoneNumber: userInfo.phoneNumber,
     status: input.status ?? null,
     paymentLocked: Boolean(input.payment_locked),
     dishes,

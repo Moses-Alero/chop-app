@@ -2,6 +2,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import {
   addCartItemInBackend,
+  buildCartUserInfo,
   cancelPaymentInBackend,
   createCartOrderInBackend,
   deleteCartInBackend,
@@ -62,12 +63,14 @@ function cloneCart(cart: Cart): Cart {
 function emptyCart(): Cart {
   return {
     id: 'cart-empty',
+    code: null,
     restaurantId: null,
     restaurantName: null,
     locationId: null,
     locationLabel: null,
     referralCode: null,
     locationNote: null,
+    phoneNumber: null,
     status: 'active',
     paymentLocked: false,
     dishes: [],
@@ -118,6 +121,33 @@ function createOptimisticDish(baseCart: Cart, restaurantId: string, dishId?: str
   return nextCart
 }
 
+function resolveStepSize(restaurantId: string, itemId?: string): number {
+  const restaurant = findMockRestaurantById(restaurantId)
+  const supportsFractionalQuantity = Boolean(
+    restaurant?.supportsFractionalQuantity || restaurant?.supportsHalfPortions,
+  )
+
+  if (!supportsFractionalQuantity) return 1
+
+  const itemStep = itemId ? findMockMenuItemById(itemId)?.quantityStep : undefined
+  if (typeof itemStep === 'number' && itemStep > 0 && itemStep < 1) return itemStep
+
+  if (typeof restaurant?.quantityStep === 'number' && restaurant.quantityStep > 0 && restaurant.quantityStep < 1) {
+    return restaurant.quantityStep
+  }
+
+  return 0.5
+}
+
+function normalizeQuantity(qty: number, step: number): number {
+  if (qty <= 0) return 0
+
+  const safeStep = step > 0 ? step : 1
+  const rounded = Math.round(qty / safeStep) * safeStep
+  const normalized = Math.max(1, rounded)
+  return Number(normalized.toFixed(2))
+}
+
 function applyOptimisticCartQuantity(input: {
   cart: Cart
   restaurantId: string
@@ -127,7 +157,7 @@ function applyOptimisticCartQuantity(input: {
   fallbackDishId?: string | null
 }): { cart: Cart, activeDishId: string | null } {
   const nextCart = cloneCart(input.cart)
-  const nextQty = Math.max(0, Math.round(input.qty))
+  const nextQty = normalizeQuantity(input.qty, resolveStepSize(input.restaurantId, input.itemId))
   const menuItem = findMockMenuItemById(input.itemId)
   const targetDishId = input.dishId ?? input.fallbackDishId ?? nextCart.dishes[0]?.id ?? `dish-temp-${Date.now()}`
   let dish = nextCart.dishes.find((entry) => entry.id === targetDishId) ?? null
@@ -210,9 +240,11 @@ type CartContextValue = {
   activeDishId: string | null
   locationId: string
   locationNote: string
+  phoneNumber: string
   referralCode: string
   setLocationId: (value: string) => Promise<void>
   setLocationNote: (value: string) => void
+  setPhoneNumber: (value: string) => void
   setReferralCode: (value: string) => void
   applyReferralCode: () => Promise<void>
   clearReferralCode: () => Promise<void>
@@ -255,6 +287,7 @@ const defaultDraft: CartDraft = {
   activeDishId: null,
   locationId: '',
   locationNote: '',
+  phoneNumber: '',
 }
 
 const CartContext = createContext<CartContextValue | null>(null)
@@ -271,6 +304,7 @@ function migrateCartDraft(value: unknown): CartDraft {
       activeDishId: draft.activeDishId ?? draft.dishes[0]?.id ?? null,
       locationId: draft.locationId ?? '',
       locationNote: draft.locationNote ?? '',
+      phoneNumber: draft.phoneNumber ?? '',
     }
   }
 
@@ -286,6 +320,7 @@ function migrateCartDraft(value: unknown): CartDraft {
     activeDishId: dish[0]?.id ?? null,
     locationId: draft.locationId ?? '',
     locationNote: draft.locationNote ?? '',
+    phoneNumber: draft.phoneNumber ?? '',
   }
 }
 
@@ -342,6 +377,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null)
   const [locationId, setLocationIdState] = useState(cartDraft.locationId)
   const [locationNote, setLocationNoteState] = useState(cartDraft.locationNote)
+  const [phoneNumber, setPhoneNumberState] = useState(cartDraft.phoneNumber)
   const [referralCode, setReferralCodeState] = useState('')
   const [activeDishId, setActiveDishId] = useState<string | null>(cartDraft.activeDishId)
   const [lastCheckoutCart, setLastCheckoutCartState] = useState<Cart | null>(() => readStoredCart(CHECKOUT_STORAGE_KEY))
@@ -357,6 +393,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const pendingPaymentReferenceRef = useRef(pendingPaymentReference)
   const locationIdRef = useRef(locationId)
   const locationNoteRef = useRef(locationNote)
+  const phoneNumberRef = useRef(phoneNumber)
   const referralCodeRef = useRef(referralCode)
   const clearCartDeferredRef = useRef<DeferredMutation | null>(null)
 
@@ -397,6 +434,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, [locationNote])
 
   useEffect(() => {
+    phoneNumberRef.current = phoneNumber
+  }, [phoneNumber])
+
+  useEffect(() => {
     referralCodeRef.current = referralCode
   }, [referralCode])
 
@@ -418,6 +459,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         setBackendCart(cart)
         setLocationIdState(cart.locationId ?? '')
         setLocationNoteState(cart.locationNote ?? '')
+        setPhoneNumberState(cart.phoneNumber ?? '')
         setReferralCodeState(cart.referralCode ?? '')
         setActiveDishId((current) => current ?? cart.dishes[0]?.id ?? null)
       } catch (nextError) {
@@ -443,11 +485,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, [authLoading, mode, token])
 
-  const syncMockDraftLocation = (nextLocationId: string, nextLocationNote: string) => {
+  const syncMockDraftCheckoutInfo = (nextLocationId: string, nextLocationNote: string, nextPhoneNumber: string) => {
     setCartDraft((current) => ({
       ...current,
       locationId: nextLocationId,
       locationNote: nextLocationNote,
+      phoneNumber: nextPhoneNumber,
     }))
   }
 
@@ -541,6 +584,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         }
         setLocationIdState(nextCart.locationId ?? '')
         setLocationNoteState(nextCart.locationNote ?? '')
+        setPhoneNumberState(nextCart.phoneNumber ?? '')
         setReferralCodeState(nextCart.referralCode ?? '')
         clearCartDeferredRef.current?.resolve()
         clearCartDeferredRef.current = null
@@ -588,6 +632,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       setServerCart(nextCart)
       setLocationIdState(nextCart.locationId ?? locationIdRef.current)
       setLocationNoteState(nextCart.locationNote ?? locationNoteRef.current)
+      setPhoneNumberState(nextCart.phoneNumber ?? phoneNumberRef.current)
       setReferralCodeState(nextCart.referralCode ?? referralCodeRef.current)
       if (mutationVersionRef.current === startVersion && !hasPendingMutations()) {
         setBackendCart(nextCart)
@@ -602,6 +647,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         setBackendCart(refreshed)
         setLocationIdState(refreshed.locationId ?? '')
         setLocationNoteState(refreshed.locationNote ?? '')
+        setPhoneNumberState(refreshed.phoneNumber ?? '')
         setReferralCodeState(refreshed.referralCode ?? '')
         setActiveDishId(refreshed.dishes[0]?.id ?? null)
       } catch {
@@ -628,7 +674,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setLocationIdState(value)
 
     if (mode === 'mock') {
-      syncMockDraftLocation(value, locationNote)
+      syncMockDraftCheckoutInfo(value, locationNote, phoneNumber)
       return
     }
 
@@ -651,7 +697,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const setLocationNote = (value: string) => {
     setLocationNoteState(value)
-    if (mode === 'mock') syncMockDraftLocation(locationId, value)
+    if (mode === 'mock') syncMockDraftCheckoutInfo(locationId, value, phoneNumber)
+  }
+
+  const setPhoneNumber = (value: string) => {
+    setPhoneNumberState(value)
+    if (mode === 'mock') syncMockDraftCheckoutInfo(locationId, locationNote, value)
   }
 
   const setReferralCode = (value: string) => {
@@ -711,13 +762,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setSyncing(true)
     try {
       let nextCart = serverCart
+      const nextUserInfo = buildCartUserInfo(phoneNumber, locationNote)
+      const currentUserInfo = buildCartUserInfo(nextCart.phoneNumber, nextCart.locationNote)
 
       if ((locationId || '') !== (serverCart.locationId ?? '')) {
         nextCart = await updateCartLocationInBackend(activeToken, locationId || null)
       }
 
-      if ((locationNote || '') !== (nextCart.locationNote ?? '')) {
-        nextCart = await updateCartInfoInBackend(activeToken, locationNote)
+      if (nextUserInfo !== currentUserInfo) {
+        nextCart = await updateCartInfoInBackend(activeToken, nextUserInfo)
       }
 
       if ((referralCode || '') !== (nextCart.referralCode ?? '')) {
@@ -728,6 +781,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       setBackendCart(nextCart)
       setLocationIdState(nextCart.locationId ?? '')
       setLocationNoteState(nextCart.locationNote ?? '')
+      setPhoneNumberState(nextCart.phoneNumber ?? '')
       setReferralCodeState(nextCart.referralCode ?? '')
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : 'Unable to save checkout info')
@@ -817,13 +871,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     return line?.qty ?? 0
   }
 
-  const getStepSize = (restaurantId: string) => {
-    if (mode === 'backend') return 1
-    const restaurant = findMockRestaurantById(restaurantId)
-    return restaurant?.supportsHalfPortions ? 0.5 : 1
-  }
+  const getStepSize = (restaurantId: string) => resolveStepSize(restaurantId)
 
   const setQuantity = async (restaurantId: string, itemId: string, qty: number, dishId?: string | null) => {
+    const stepSize = resolveStepSize(restaurantId, itemId)
+    const normalizedQty = normalizeQuantity(qty, stepSize)
+
     if (mode === 'mock') {
       const restaurant = findMockRestaurantById(restaurantId)
       const item = findMockMenuItemById(itemId)
@@ -840,8 +893,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         const targetDishId = dishId ?? current.activeDishId ?? baseDishes[0].id
         const targetDish = baseDishes.find((dish) => dish.id === targetDishId) ?? baseDishes[0]
 
-        if (qty <= 0) delete targetDish.quantities[itemId]
-        else targetDish.quantities[itemId] = Number(qty.toFixed(2))
+        if (normalizedQty <= 0) delete targetDish.quantities[itemId]
+        else targetDish.quantities[itemId] = normalizedQty
 
         return {
           ...current,
@@ -854,12 +907,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
 
     ensureCartUnlocked()
-    const nextQty = Math.max(0, Math.round(qty))
     const optimistic = applyOptimisticCartQuantity({
       cart: backendCart,
       restaurantId,
       itemId,
-      qty: nextQty,
+      qty: normalizedQty,
       dishId,
       fallbackDishId: activeDishId,
     })
@@ -891,7 +943,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       dishId: targetDishId,
       itemId,
       restaurantId,
-      qty: nextQty,
+      qty: normalizedQty,
     })
     markMutation()
   }
@@ -921,6 +973,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       activeDishId: dishes[0]?.id ?? null,
       locationId: order.locationId,
       locationNote: order.locationNote,
+      phoneNumber: order.cart.phoneNumber ?? '',
     })
   }
 
@@ -951,6 +1004,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         activeDishId: dishes[0]?.id ?? null,
         locationId,
         locationNote,
+        phoneNumber,
       })
 
       return { addedItems, skippedItems }
@@ -983,6 +1037,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       setActiveDishId(nextCart.dishes[0]?.id ?? null)
       setLocationIdState(nextCart.locationId ?? locationId)
       setLocationNoteState(nextCart.locationNote ?? locationNote)
+      setPhoneNumberState(nextCart.phoneNumber ?? phoneNumber)
       setReferralCodeState(nextCart.referralCode ?? referralCode)
 
       return { addedItems, skippedItems }
@@ -1005,6 +1060,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       setBackendCart(nextCart)
       setLocationIdState(nextCart.locationId ?? '')
       setLocationNoteState(nextCart.locationNote ?? '')
+      setPhoneNumberState(nextCart.phoneNumber ?? '')
       setReferralCodeState(nextCart.referralCode ?? '')
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : 'Unable to refresh cart')
@@ -1061,9 +1117,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     activeDishId: mode === 'mock' ? cartDraft.activeDishId : activeDishId,
     locationId,
     locationNote,
+    phoneNumber,
     referralCode,
     setLocationId,
     setLocationNote,
+    setPhoneNumber,
     setReferralCode,
     applyReferralCode,
     clearReferralCode,

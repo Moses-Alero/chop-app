@@ -30,135 +30,138 @@ Call log:
 - generic [ref=e3]:
   - main [ref=e5]:
     - generic [ref=e6]:
-      - button "Open menu" [ref=e7] [cursor=pointer]:
-        - img [ref=e8]
-      - generic [ref=e9]:
-        - generic [ref=e10]: Location
-        - generic [ref=e11]:
-          - img [ref=e12]
-          - combobox "Location" [ref=e15]:
+      - button "Open menu" [ref=e7] [cursor=pointer]
+      - generic [ref=e8]:
+        - generic [ref=e9]: Location
+        - generic [ref=e10]:
+          - img [ref=e11]
+          - combobox "Location" [ref=e14]:
             - option "Ikeja" [selected]
             - option "Yaba"
             - option "Victoria Island"
             - option "Lekki Phase 1"
-      - generic [ref=e16]:
-        - generic [ref=e17]:
-          - button "Open search" [ref=e18] [cursor=pointer]:
-            - img [ref=e19]
-          - generic [ref=e22]: Search for food and restaurants
-          - textbox "Search for food and restaurants" [ref=e23]:
+      - generic [ref=e15]:
+        - generic [ref=e16]:
+          - button "Open search" [ref=e17] [cursor=pointer]:
+            - img [ref=e18]
+          - generic [ref=e21]: Search for food and restaurants
+          - textbox "Search for food and restaurants" [ref=e22]:
             - /placeholder: Search food and restaurants
-        - button "Open cart" [ref=e24] [cursor=pointer]:
-          - img [ref=e25]
-    - generic [ref=e28]:
-      - generic [ref=e29]:
-        - heading "ChopLink specials" [level=1] [ref=e30]
-        - paragraph [ref=e31]: Quick restaurant discovery and checkout inside Telegram.
-        - button "Order Now" [ref=e32] [cursor=pointer]
-      - img "Pizza Hut" [ref=e33]
-    - generic [ref=e34]:
-      - generic [ref=e36]:
-        - paragraph [ref=e37]: Discovery
-        - heading "Browse by what matters now" [level=2] [ref=e38]
-      - generic [ref=e39]:
-        - button "Pizza Hut Pizza • Fast food Pizza Hut 20–30 mins" [ref=e40] [cursor=pointer]:
-          - img "Pizza Hut" [ref=e41]
-          - generic [ref=e42]:
-            - paragraph [ref=e43]: Pizza • Fast food
-            - heading "Pizza Hut" [level=3] [ref=e44]
-            - generic [ref=e45]: 20–30 mins
-        - button "Jollof Republic African • Rice bowls Jollof Republic 25–35 mins" [ref=e46] [cursor=pointer]:
-          - img "Jollof Republic" [ref=e47]
-          - generic [ref=e48]:
-            - paragraph [ref=e49]: African • Rice bowls
-            - heading "Jollof Republic" [level=3] [ref=e50]
-            - generic [ref=e51]: 25–35 mins
-        - button "Green Bowl Healthy • Salads Green Bowl 15–25 mins" [ref=e52] [cursor=pointer]:
-          - img "Green Bowl" [ref=e53]
-          - generic [ref=e54]:
-            - paragraph [ref=e55]: Healthy • Salads
-            - heading "Green Bowl" [level=3] [ref=e56]
-            - generic [ref=e57]: 15–25 mins
-    - generic [ref=e58]:
-      - generic [ref=e59]:
-        - generic [ref=e60]:
-          - paragraph [ref=e61]: Restaurants
-          - heading "Discover nearby options" [level=2] [ref=e62]
-        - button "See All" [ref=e64] [cursor=pointer]
-      - generic [ref=e65]:
-        - link "Pizza Hut Open Pizza Hut 4.8 Pizza • Fast food Classic pizza, bowls, and sides for quick city delivery. 20–30 mins" [ref=e66] [cursor=pointer]:
+        - button "Open cart" [ref=e23] [cursor=pointer]:
+          - img [ref=e24]
+    - generic [ref=e27]:
+      - generic [ref=e28]:
+        - heading "ChopLink specials" [level=1] [ref=e29]
+        - paragraph [ref=e30]: Order from Jollof Republic without leaving Telegram.
+        - button "Order Now" [ref=e31] [cursor=pointer]
+      - img "Jollof Republic" [ref=e32]
+    - generic [ref=e33]:
+      - generic [ref=e35]:
+        - paragraph [ref=e36]: Discovery
+        - heading "Featured restaurants" [level=2] [ref=e37]
+      - generic [ref=e38]:
+        - button "Jollof Republic African • Rice bowls Jollof Republic 25–35 mins" [ref=e39] [cursor=pointer]:
+          - img "Jollof Republic" [ref=e40]
+          - generic [ref=e41]:
+            - paragraph [ref=e42]: African • Rice bowls
+            - heading "Jollof Republic" [level=3] [ref=e43]
+            - generic [ref=e44]: 25–35 mins
+        - button "Green Bowl Healthy • Salads Green Bowl 15–25 mins" [ref=e45] [cursor=pointer]:
+          - img "Green Bowl" [ref=e46]
+          - generic [ref=e47]:
+            - paragraph [ref=e48]: Healthy • Salads
+            - heading "Green Bowl" [level=3] [ref=e49]
+            - generic [ref=e50]: 15–25 mins
+        - button "Pizza Hut Pizza • Fast food Pizza Hut 20–30 mins" [ref=e51] [cursor=pointer]:
+          - img "Pizza Hut" [ref=e52]
+          - generic [ref=e53]:
+            - paragraph [ref=e54]: Pizza • Fast food
+            - heading "Pizza Hut" [level=3] [ref=e55]
+            - generic [ref=e56]: 20–30 mins
+      - generic "Featured restaurants carousel position" [ref=e57]:
+        - button "Show featured restaurant 1" [ref=e58] [cursor=pointer]
+        - button "Show featured restaurant 2" [ref=e59] [cursor=pointer]
+        - button "Show featured restaurant 3" [ref=e60] [cursor=pointer]
+    - generic [ref=e61]:
+      - generic [ref=e62]:
+        - generic [ref=e63]:
+          - paragraph [ref=e64]: Restaurants
+          - heading "Discover nearby options" [level=2] [ref=e65]
+        - button "See All" [ref=e67] [cursor=pointer]
+      - generic [ref=e68]:
+        - link "Pizza Hut Open Pizza Hut 4.8 Pizza • Fast food Classic pizza, bowls, and sides for quick city delivery. 20–30 mins" [ref=e69] [cursor=pointer]:
           - /url: /restaurants/r1
-          - generic [ref=e67]:
-            - img "Pizza Hut" [ref=e68]
-            - generic [ref=e69]: Open
           - generic [ref=e70]:
-            - generic [ref=e71]:
-              - generic [ref=e72]:
-                - img [ref=e73]
-                - heading "Pizza Hut" [level=2] [ref=e77]
-              - generic [ref=e78]:
-                - img [ref=e79]
-                - generic [ref=e81]: "4.8"
-            - paragraph [ref=e82]:
-              - img [ref=e83]
-              - generic [ref=e88]: Pizza • Fast food
-            - paragraph [ref=e89]: Classic pizza, bowls, and sides for quick city delivery.
-            - generic [ref=e91]:
-              - img [ref=e92]
-              - generic [ref=e95]: 20–30 mins
-        - link "Jollof Republic Open Jollof Republic 4.7 African • Rice bowls Jollof rice, grills, and everyday comfort meals. 25–35 mins" [ref=e96] [cursor=pointer]:
+            - img "Pizza Hut" [ref=e71]
+            - generic [ref=e72]: Open
+          - generic [ref=e73]:
+            - generic [ref=e74]:
+              - generic [ref=e75]:
+                - img [ref=e76]
+                - heading "Pizza Hut" [level=2] [ref=e80]
+              - generic [ref=e81]:
+                - img [ref=e82]
+                - generic [ref=e84]: "4.8"
+            - paragraph [ref=e85]:
+              - img [ref=e86]
+              - generic [ref=e91]: Pizza • Fast food
+            - paragraph [ref=e92]: Classic pizza, bowls, and sides for quick city delivery.
+            - generic [ref=e94]:
+              - img [ref=e95]
+              - generic [ref=e98]: 20–30 mins
+        - link "Jollof Republic Open Jollof Republic 4.7 African • Rice bowls Jollof rice, grills, and everyday comfort meals. 25–35 mins" [ref=e99] [cursor=pointer]:
           - /url: /restaurants/r2
-          - generic [ref=e97]:
-            - img "Jollof Republic" [ref=e98]
-            - generic [ref=e99]: Open
           - generic [ref=e100]:
-            - generic [ref=e101]:
-              - generic [ref=e102]:
-                - img [ref=e103]
-                - heading "Jollof Republic" [level=2] [ref=e107]
-              - generic [ref=e108]:
-                - img [ref=e109]
-                - generic [ref=e111]: "4.7"
-            - paragraph [ref=e112]:
-              - img [ref=e113]
-              - generic [ref=e118]: African • Rice bowls
-            - paragraph [ref=e119]: Jollof rice, grills, and everyday comfort meals.
-            - generic [ref=e121]:
-              - img [ref=e122]
-              - generic [ref=e125]: 25–35 mins
-        - link "Green Bowl Closed Green Bowl 4.5 Healthy • Salads Fresh bowls, wraps, and smoothies. 15–25 mins" [ref=e126] [cursor=pointer]:
+            - img "Jollof Republic" [ref=e101]
+            - generic [ref=e102]: Open
+          - generic [ref=e103]:
+            - generic [ref=e104]:
+              - generic [ref=e105]:
+                - img [ref=e106]
+                - heading "Jollof Republic" [level=2] [ref=e110]
+              - generic [ref=e111]:
+                - img [ref=e112]
+                - generic [ref=e114]: "4.7"
+            - paragraph [ref=e115]:
+              - img [ref=e116]
+              - generic [ref=e121]: African • Rice bowls
+            - paragraph [ref=e122]: Jollof rice, grills, and everyday comfort meals.
+            - generic [ref=e124]:
+              - img [ref=e125]
+              - generic [ref=e128]: 25–35 mins
+        - link "Green Bowl Closed Green Bowl 4.5 Healthy • Salads Fresh bowls, wraps, and smoothies. 15–25 mins" [ref=e129] [cursor=pointer]:
           - /url: /restaurants/r3
-          - generic [ref=e127]:
-            - img "Green Bowl" [ref=e128]
-            - generic [ref=e129]: Closed
           - generic [ref=e130]:
-            - generic [ref=e131]:
-              - generic [ref=e132]:
-                - img [ref=e133]
-                - heading "Green Bowl" [level=2] [ref=e137]
-              - generic [ref=e138]:
-                - img [ref=e139]
-                - generic [ref=e141]: "4.5"
-            - paragraph [ref=e142]:
-              - img [ref=e143]
-              - generic [ref=e148]: Healthy • Salads
-            - paragraph [ref=e149]: Fresh bowls, wraps, and smoothies.
-            - generic [ref=e151]:
-              - img [ref=e152]
-              - generic [ref=e155]: 15–25 mins
-  - navigation "Primary navigation" [ref=e156]:
-    - link "Home" [ref=e157] [cursor=pointer]:
+            - img "Green Bowl" [ref=e131]
+            - generic [ref=e132]: Closed
+          - generic [ref=e133]:
+            - generic [ref=e134]:
+              - generic [ref=e135]:
+                - img [ref=e136]
+                - heading "Green Bowl" [level=2] [ref=e140]
+              - generic [ref=e141]:
+                - img [ref=e142]
+                - generic [ref=e144]: "4.5"
+            - paragraph [ref=e145]:
+              - img [ref=e146]
+              - generic [ref=e151]: Healthy • Salads
+            - paragraph [ref=e152]: Fresh bowls, wraps, and smoothies.
+            - generic [ref=e154]:
+              - img [ref=e155]
+              - generic [ref=e158]: 15–25 mins
+  - navigation "Primary navigation" [ref=e159]:
+    - link "Home" [ref=e160] [cursor=pointer]:
       - /url: /
-      - img [ref=e158]
-      - generic [ref=e161]: Home
-    - link "History" [ref=e162] [cursor=pointer]:
+      - img [ref=e161]
+      - generic [ref=e164]: Home
+    - link "History" [ref=e165] [cursor=pointer]:
       - /url: /history
-      - img [ref=e163]
-      - generic [ref=e167]: History
-    - link "Cart" [ref=e168] [cursor=pointer]:
+      - img [ref=e166]
+      - generic [ref=e170]: History
+    - link "Cart" [ref=e171] [cursor=pointer]:
       - /url: /cart
-      - img [ref=e169]
-      - generic [ref=e172]: Cart
+      - img [ref=e172]
+      - generic [ref=e175]: Cart
 ```
 
 # Test source
@@ -275,11 +278,24 @@ Call log:
   108 |     await page.screenshot({ path: testInfo.outputPath('dish-group-removed.png'), fullPage: true })
   109 |   })
   110 | 
-  111 |   test('history screen clearly states current mode limitation', async ({ page }, testInfo) => {
-  112 |     await page.goto('/#/history')
-  113 |     await expect(page.getByText(/Order history is unavailable in current app mode/)).toBeVisible()
-  114 |     await page.screenshot({ path: testInfo.outputPath('history-limitation.png'), fullPage: true })
-  115 |   })
-  116 | })
+  111 |   test('see all opens restaurants page and specials CTA opens restaurant page', async ({ page }, testInfo) => {
+  112 |     await page.goto('/')
+  113 | 
+  114 |     await page.getByRole('button', { name: 'See All' }).click()
+  115 |     await expect(page).toHaveURL(/\/restaurants$/)
+  116 |     await expect(page.getByRole('heading', { name: 'Restaurants' })).toBeVisible()
   117 | 
+  118 |     await page.goto('/')
+  119 |     await page.getByTestId('specials-order-now').click()
+  120 |     await expect(page).toHaveURL(/\/restaurants\/(\d+|r\d+)/)
+  121 |     await page.screenshot({ path: testInfo.outputPath('restaurants-page-and-specials.png'), fullPage: true })
+  122 |   })
+  123 | 
+  124 |   test('history screen clearly states current mode limitation', async ({ page }, testInfo) => {
+  125 |     await page.goto('/#/history')
+  126 |     await expect(page.getByText(/Order history is unavailable in current app mode/)).toBeVisible()
+  127 |     await page.screenshot({ path: testInfo.outputPath('history-limitation.png'), fullPage: true })
+  128 |   })
+  129 | })
+  130 | 
 ```

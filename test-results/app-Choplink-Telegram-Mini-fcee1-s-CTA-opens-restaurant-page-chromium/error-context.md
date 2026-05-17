@@ -6,22 +6,21 @@
 
 # Test info
 
-- Name: app.spec.ts >> Choplink Telegram Mini App flows >> cart route shows empty state when no items exist
-- Location: e2e/app.spec.ts:83:3
+- Name: app.spec.ts >> Choplink Telegram Mini App flows >> see all opens restaurants page and specials CTA opens restaurant page
+- Location: e2e/app.spec.ts:111:3
 
 # Error details
 
 ```
-Error: expect(locator).toBeVisible() failed
+Error: expect(page).toHaveURL(expected) failed
 
-Locator: getByTestId('empty-cart-state')
-Expected: visible
+Expected pattern: /\/restaurants\/(\d+|r\d+)/
+Received string:  "http://127.0.0.1:4173/"
 Timeout: 5000ms
-Error: element(s) not found
 
 Call log:
-  - Expect "toBeVisible" with timeout 5000ms
-  - waiting for getByTestId('empty-cart-state')
+  - Expect "toHaveURL" with timeout 5000ms
+    9 × unexpected value "http://127.0.0.1:4173/"
 
 ```
 
@@ -53,26 +52,26 @@ Call log:
     - generic [ref=e27]:
       - generic [ref=e28]:
         - heading "ChopLink specials" [level=1] [ref=e29]
-        - paragraph [ref=e30]: Order from Green Bowl without leaving Telegram.
-        - button "Order Now" [ref=e31] [cursor=pointer]
-      - img "Green Bowl" [ref=e32]
+        - paragraph [ref=e30]: Order from Jollof Republic without leaving Telegram.
+        - button "Order Now" [active] [ref=e31] [cursor=pointer]
+      - img "Jollof Republic" [ref=e32]
     - generic [ref=e33]:
       - generic [ref=e35]:
         - paragraph [ref=e36]: Discovery
         - heading "Featured restaurants" [level=2] [ref=e37]
       - generic [ref=e38]:
-        - button "Jollof Republic African • Rice bowls Jollof Republic 25–35 mins" [ref=e39] [cursor=pointer]:
-          - img "Jollof Republic" [ref=e40]
+        - button "Pizza Hut Pizza • Fast food Pizza Hut 20–30 mins" [ref=e39] [cursor=pointer]:
+          - img "Pizza Hut" [ref=e40]
           - generic [ref=e41]:
-            - paragraph [ref=e42]: African • Rice bowls
-            - heading "Jollof Republic" [level=3] [ref=e43]
-            - generic [ref=e44]: 25–35 mins
-        - button "Pizza Hut Pizza • Fast food Pizza Hut 20–30 mins" [ref=e45] [cursor=pointer]:
-          - img "Pizza Hut" [ref=e46]
+            - paragraph [ref=e42]: Pizza • Fast food
+            - heading "Pizza Hut" [level=3] [ref=e43]
+            - generic [ref=e44]: 20–30 mins
+        - button "Jollof Republic African • Rice bowls Jollof Republic 25–35 mins" [ref=e45] [cursor=pointer]:
+          - img "Jollof Republic" [ref=e46]
           - generic [ref=e47]:
-            - paragraph [ref=e48]: Pizza • Fast food
-            - heading "Pizza Hut" [level=3] [ref=e49]
-            - generic [ref=e50]: 20–30 mins
+            - paragraph [ref=e48]: African • Rice bowls
+            - heading "Jollof Republic" [level=3] [ref=e49]
+            - generic [ref=e50]: 25–35 mins
         - button "Green Bowl Healthy • Salads Green Bowl 15–25 mins" [ref=e51] [cursor=pointer]:
           - img "Green Bowl" [ref=e52]
           - generic [ref=e53]:
@@ -168,25 +167,6 @@ Call log:
 # Test source
 
 ```ts
-  1   | import { expect, test } from '@playwright/test'
-  2   | 
-  3   | async function openFirstRestaurant(page: import('@playwright/test').Page) {
-  4   |   const firstRestaurant = page.locator('[data-testid^="restaurant-card-"]').first()
-  5   |   await expect(firstRestaurant).toBeVisible()
-  6   |   await firstRestaurant.click({ force: true })
-  7   |   await expect(page).toHaveURL(/restaurants\/\d+|restaurants\/r\d+/)
-  8   | }
-  9   | 
-  10  | async function addFirstVisibleItems(page: import('@playwright/test').Page, count = 1) {
-  11  |   for (let index = 0; index < count; index += 1) {
-  12  |     const addButtons = page.locator('[data-testid^="add-item-"]')
-  13  |     await expect(addButtons.first()).toBeVisible()
-  14  |     await addButtons.first().click()
-  15  |   }
-  16  | }
-  17  | 
-  18  | test.describe('Choplink Telegram Mini App flows', () => {
-  19  |   test('happy path: discovery to checkout success', async ({ page }, testInfo) => {
   20  |     await page.goto('/')
   21  | 
   22  |     await expect(page.getByRole('heading', { name: 'Discover nearby options' })).toBeVisible()
@@ -252,8 +232,7 @@ Call log:
   82  | 
   83  |   test('cart route shows empty state when no items exist', async ({ page }, testInfo) => {
   84  |     await page.goto('/#/cart')
-> 85  |     await expect(page.getByTestId('empty-cart-state')).toBeVisible()
-      |                                                        ^ Error: expect(locator).toBeVisible() failed
+  85  |     await expect(page.getByTestId('empty-cart-state')).toBeVisible()
   86  |     await expect(page.getByRole('heading', { name: 'Empty Cart' })).toBeVisible()
   87  |     await page.screenshot({ path: testInfo.outputPath('empty-cart.png'), fullPage: true })
   88  |   })
@@ -288,7 +267,8 @@ Call log:
   117 | 
   118 |     await page.goto('/')
   119 |     await page.getByTestId('specials-order-now').click()
-  120 |     await expect(page).toHaveURL(/\/restaurants\/(\d+|r\d+)/)
+> 120 |     await expect(page).toHaveURL(/\/restaurants\/(\d+|r\d+)/)
+      |                        ^ Error: expect(page).toHaveURL(expected) failed
   121 |     await page.screenshot({ path: testInfo.outputPath('restaurants-page-and-specials.png'), fullPage: true })
   122 |   })
   123 | 

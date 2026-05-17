@@ -37,46 +37,64 @@ Call log:
     - generic [ref=e16]:
       - paragraph [ref=e17]: Checkout
       - heading "Confirm delivery details" [level=2] [ref=e18]
-    - paragraph [ref=e19]: Review rider location, note, and total before submitting order.
+    - paragraph [ref=e19]: Add payment email, confirm delivery details, pay.
   - generic [ref=e20]:
     - generic [ref=e21]:
       - img [ref=e22]
+      - text: Email for payment
+    - textbox "Email for payment" [ref=e25]:
+      - /placeholder: name@example.com
+    - paragraph [ref=e26]: Email required for payment
+  - generic [ref=e27]:
+    - generic [ref=e28]:
+      - img [ref=e29]
       - text: Delivery Area
-    - combobox "Delivery Area" [ref=e25]:
+    - combobox "Delivery Area" [ref=e32]:
       - option "Select delivery area"
       - option "Ikeja" [selected]
       - option "Yaba"
       - option "Victoria Island"
       - option "Lekki Phase 1"
-    - paragraph [ref=e26]: Delivery fee updates from backend cart after location sync.
-  - generic [ref=e27]:
-    - generic [ref=e28]:
-      - img [ref=e29]
+    - generic [ref=e33]:
+      - generic [ref=e34]:
+        - paragraph [ref=e35]: Delivery fee
+        - strong [ref=e36]: ₦50,000
+      - generic [ref=e37]:
+        - paragraph [ref=e38]: Current total
+        - strong [ref=e39]: ₦1,470,000
+  - generic [ref=e40]:
+    - generic [ref=e41]:
+      - img [ref=e42]
       - text: Note for rider
-    - textbox "Note for rider" [ref=e32]:
+    - textbox "Note for rider" [ref=e45]:
       - /placeholder: Add estate gate, floor, landmark, or callout to help rider locate you faster
       - text: Blue gate beside the petrol station, call on arrival
-    - paragraph [ref=e33]: "Saved to backend as `user_info`."
-  - generic [ref=e34]:
-    - generic [ref=e35]:
-      - img [ref=e36]
-      - text: Referral code
-    - textbox "Referral code" [active] [ref=e39]:
-      - /placeholder: Optional referral code
-      - text: AMB001
-    - paragraph [ref=e40]: Optional. Backend applies discount once per cart.
-  - button "Order Summary" [ref=e42] [cursor=pointer]:
-    - generic [ref=e43]:
-      - img [ref=e44]
-      - generic [ref=e47]: Order Summary
-    - img [ref=e48]
-  - button "Pricing Total amount Total ₦1,470,000" [ref=e51] [cursor=pointer]:
-    - generic [ref=e52]:
-      - paragraph [ref=e53]: Pricing
-      - heading "Total amount" [level=3] [ref=e54]
+    - paragraph [ref=e46]: "Saved to backend as `user_info`."
+  - generic [ref=e47]:
+    - generic [ref=e48]:
+      - generic [ref=e49]:
+        - img [ref=e50]
+        - text: Referral code
+      - generic [ref=e54]: Unsaved
     - generic [ref=e55]:
-      - generic [ref=e56]: Total
-      - generic [ref=e57]: ₦1,470,000
+      - textbox "Referral code" [active] [ref=e56]:
+        - /placeholder: Optional referral code
+        - text: AMB001
+      - button "Apply" [ref=e57] [cursor=pointer]
+      - button "Clear" [ref=e58] [cursor=pointer]
+    - paragraph [ref=e59]: Optional. Backend applies discount once per cart.
+  - button "Order Summary" [ref=e61] [cursor=pointer]:
+    - generic [ref=e62]:
+      - img [ref=e63]
+      - generic [ref=e66]: Order Summary
+    - img [ref=e67]
+  - button "Total Items Ikeja Total ₦1,470,000" [ref=e70] [cursor=pointer]:
+    - generic [ref=e71]:
+      - heading "Total Items" [level=3] [ref=e73]
+      - paragraph [ref=e74]: Ikeja
+    - generic [ref=e75]:
+      - generic [ref=e76]: Total
+      - generic [ref=e77]: ₦1,470,000
   - generic:
     - button
     - generic:
@@ -85,8 +103,10 @@ Call log:
           - generic: Pricing breakdown
           - img
       - generic:
-        - paragraph: Pricing
-        - heading [level=3]: Total amount
+        - generic:
+          - paragraph: Pricing
+          - heading [level=3]: Total amount
+        - paragraph: 2 items
       - generic:
         - generic: Items Total
         - generic: ₦1,420,000
@@ -94,10 +114,7 @@ Call log:
         - generic: Delivery Fee
         - generic: ₦50,000
       - generic:
-        - generic: Handling Fee
-        - generic: ₦0
-      - generic:
-        - generic: Surcharge
+        - generic: Service Charge
         - generic: ₦0
       - generic:
         - generic: Transaction Fee
@@ -227,11 +244,24 @@ Call log:
   108 |     await page.screenshot({ path: testInfo.outputPath('dish-group-removed.png'), fullPage: true })
   109 |   })
   110 | 
-  111 |   test('history screen clearly states current mode limitation', async ({ page }, testInfo) => {
-  112 |     await page.goto('/#/history')
-  113 |     await expect(page.getByText(/Order history is unavailable in current app mode/)).toBeVisible()
-  114 |     await page.screenshot({ path: testInfo.outputPath('history-limitation.png'), fullPage: true })
-  115 |   })
-  116 | })
+  111 |   test('see all opens restaurants page and specials CTA opens restaurant page', async ({ page }, testInfo) => {
+  112 |     await page.goto('/')
+  113 | 
+  114 |     await page.getByRole('button', { name: 'See All' }).click()
+  115 |     await expect(page).toHaveURL(/\/restaurants$/)
+  116 |     await expect(page.getByRole('heading', { name: 'Restaurants' })).toBeVisible()
   117 | 
+  118 |     await page.goto('/')
+  119 |     await page.getByTestId('specials-order-now').click()
+  120 |     await expect(page).toHaveURL(/\/restaurants\/(\d+|r\d+)/)
+  121 |     await page.screenshot({ path: testInfo.outputPath('restaurants-page-and-specials.png'), fullPage: true })
+  122 |   })
+  123 | 
+  124 |   test('history screen clearly states current mode limitation', async ({ page }, testInfo) => {
+  125 |     await page.goto('/#/history')
+  126 |     await expect(page.getByText(/Order history is unavailable in current app mode/)).toBeVisible()
+  127 |     await page.screenshot({ path: testInfo.outputPath('history-limitation.png'), fullPage: true })
+  128 |   })
+  129 | })
+  130 | 
 ```

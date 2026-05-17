@@ -37,12 +37,14 @@ export function SuccessPage() {
       <section className="card success-card" data-testid="success-screen">
         <div className="success-icon"><CheckCircle2 size={20} /></div>
         <h2>Your order has been placed and is awaiting restaurant approval</h2>
+        {cart.code ? <p className="helper"><strong>Order code:</strong> {cart.code}</p> : null}
         {cart.locationLabel ? (
           <p className="helper icon-label icon-label--start">
             <MapPin size={13} />
             <span>Delivery to: {cart.locationLabel}</span>
           </p>
         ) : null}
+        {cart.phoneNumber ? <p className="helper">Phone: {cart.phoneNumber}</p> : null}
         {cart.locationNote ? <p className="helper">Rider note: {cart.locationNote}</p> : null}
       </section>
 

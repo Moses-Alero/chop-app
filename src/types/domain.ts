@@ -67,6 +67,7 @@ export type CartDraft = {
   activeDishId: string | null
   locationId: string
   locationNote: string
+  phoneNumber: string
 }
 
 export type CartLine = {
@@ -107,12 +108,14 @@ export type CartPricingSummary = {
 
 export type Cart = {
   id: string
+  code: string | null
   restaurantId: string | null
   restaurantName: string | null
   locationId?: string | null
   locationLabel?: string | null
   referralCode?: string | null
   locationNote?: string | null
+  phoneNumber?: string | null
   status?: string | null
   paymentLocked?: boolean
   dishes: CartDish[]

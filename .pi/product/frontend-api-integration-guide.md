@@ -38,7 +38,6 @@ Fully usable now:
 Still not real backend product flows yet:
 
 - backend reorder endpoint
-- fractional quantity / half-step quantity
 
 ---
 
@@ -116,8 +115,8 @@ Stable fields to use now:
 
 Capability flags:
 
-- `supports_fractional_quantity` is currently `false`
-- `quantity_step` is currently `1`
+- `supports_fractional_quantity` indicates whether that restaurant accepts half-step quantities
+- `quantity_step` is `0.5` when fractional quantities are supported, otherwise `1`
 
 ### 3.2 Restaurant detail
 
@@ -259,6 +258,7 @@ Endpoint:
 
 Use as source of truth for:
 
+- master order code via `cart.code`
 - dish groups
 - selected location
 - rider note
@@ -269,6 +269,7 @@ Use as source of truth for:
 
 Important:
 
+- `cart.code` is master order code frontend should display to user for order identification
 - `cart.payment_locked = true` means payment has been initialized and cart can no longer be mutated until payment is either completed or cancelled/failed
 
 ### 6.2 Dish groups mapping
@@ -337,14 +338,17 @@ Request:
 
 Important:
 
-- integer only
-- no `0.5`
-- no half portions in current backend contract
+- minimum quantity is `1`
+- for restaurants with `supports_fractional_quantity = false`, quantity must be whole number only
+- for restaurants with `supports_fractional_quantity = true`, valid quantities are `1`, `1.5`, `2`, `2.5`, etc.
+- `0.5` is still invalid because quantity cannot be less than `1`
 
 Frontend rule:
 
-- disable fractional quantity controls
-- stepper increment should be `1`
+- use restaurant capability flag from `GET /restaurants`, `GET /restaurants/{id}`, or `GET /restaurants/{id}/menu`
+- if `supports_fractional_quantity = true`, set stepper increment to `0.5`
+- otherwise set stepper increment to `1`
+- enforce minimum value `1`
 
 ### 6.6 Delete item
 
@@ -379,7 +383,6 @@ Behavior:
 - deletes active cart if present
 - if no active cart exists, backend still returns success
 - response `result` will be `null`
-- if `cart.payment_locked = true`, backend rejects clear-cart until payment is cancelled/failed
 
 ---
 
@@ -595,7 +598,6 @@ Blocked while locked:
 - update rider note
 - update location
 - update referral
-- clear whole cart
 
 If payment is cancelled/failed:
 
@@ -656,16 +658,14 @@ Important:
 
 Frontend should not rely on these yet:
 
-- fractional item quantity
-- half-step quantity
 - backend reorder endpoint
 - guaranteed restaurant metadata for description/rating/cuisine/open-state
 
 Graceful degradation rules:
 
 - if metadata field is `null`, hide section
-- if fractional quantity unsupported, use integer stepper only
-- if no payment backend flow, keep payment UI behind feature flag or mock mode
+- if restaurant does not support fractional quantity, use integer stepper only
+- if restaurant supports fractional quantity, use `0.5` step with minimum `1`
 
 ---
 
@@ -724,7 +724,7 @@ Graceful degradation rules:
 15. If needed, poll `GET /payments/{reference}` or cancel via `POST /payments/cancel`
 16. Render success from verified payment response
 17. Later fetch `GET /orders/history` to show previous orders or rebuild a new cart in frontend
-18. Optional clear-cart UX may call `DELETE /cart/` only when cart is not payment-locked
+18. Optional clear-cart UX may call `DELETE /cart/`
 
 ---
 
@@ -734,10 +734,12 @@ Graceful degradation rules:
 
 - child cart order = dish group
 - `user_info` = rider note / instructions
-- quantity = integer only
+- quantity minimum = `1`
+- if restaurant has `supports_fractional_quantity = true`, quantity step = `0.5`
+- if restaurant has `supports_fractional_quantity = false`, quantity step = `1`
 - location belongs to cart
 - referral code must exist in ambassadors table to apply discount
-- `DELETE /cart/` clears active cart in one call when cart is not payment-locked
+- `DELETE /cart/` clears active cart in one call and returns success even if no active cart exists
 - payment init requires `cart_id`, `email`, and `callback_url`
 - user email is persisted from first payment init and can be reused as default later
 - backend does not return Paystack public key; frontend owns that config
@@ -753,4 +755,4 @@ Graceful degradation rules:
 - backend reorder endpoint
 - historical location snapshot for reorder
 - map-based locations
-- half portions
+- per-menu-item fractional override; capability is currently restaurant-level
